@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SP Vision MQTT Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #667085;
+      --border: #d8dee9;
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --red: #dc2626;
+      --green: #16a34a;
+      --log-bg: #101828;
+      --log-text: #d0d5dd;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-height: 68px;
+      padding: 12px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 174px;
+      line-height: 1.15;
+    }
+
+    .brand strong {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: end;
+      gap: 12px;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 168px;
+    }
+
+    input {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--text);
+      background: #fff;
+      font: inherit;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+    }
+
+    input:disabled {
+      color: #98a2b3;
+      background: #f2f4f7;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+    }
+
+    button {
+      min-width: 108px;
+      min-height: 38px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: var(--blue-dark);
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    button.secondary:hover:not(:disabled) {
+      background: #f9fafb;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 152px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.12);
+    }
+
+    .status-dot.online {
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.14);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+      gap: 16px;
+      padding: 16px;
+      min-height: 0;
+    }
+
+    .chart-panel,
+    .raw-panel {
+      min-width: 0;
+      min-height: 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+
+    .chart-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      padding: 16px;
+    }
+
+    .panel-title {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    #chart {
+      width: 100%;
+      min-height: 420px;
+    }
+
+    .raw-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+    }
+
+    .raw-panel header {
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #raw-log {
+      margin: 0;
+      padding: 14px 16px;
+      overflow: auto;
+      background: var(--log-bg);
+      color: var(--log-text);
+      font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    @media (max-width: 880px) {
+      .topbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .brand {
+        min-width: 0;
+      }
+
+      .controls {
+        align-items: stretch;
+      }
+
+      label,
+      .actions,
+      .status {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      button {
+        min-width: 0;
+      }
+
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      #chart {
+        min-height: 340px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <strong>MQTT Dashboard</strong>
+        <span>SP Vision Probe</span>
+      </div>
+      <div class="controls">
+        <label>
+          Broker Host
+          <input id="broker-host" autocomplete="off" spellcheck="false">
+        </label>
+        <label>
+          Robot ID
+          <input id="robot-id" autocomplete="off" spellcheck="false" value="myrobot">
+        </label>
+        <div class="actions">
+          <button id="connect" class="primary" type="button">Connect</button>
+          <button id="disconnect" class="secondary" type="button" disabled>Disconnect</button>
+        </div>
+        <div class="status" aria-live="polite">
+          <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+          <span id="status-label">Disconnected</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="chart-panel" aria-label="MQTT numeric fields chart">
+        <h1 class="panel-title">Numeric Fields</h1>
+        <div id="chart"></div>
+      </section>
+      <section class="raw-panel" aria-label="Raw MQTT messages">
+        <header>
+          <h2 class="panel-title">Raw Messages</h2>
+        </header>
+        <pre id="raw-log"></pre>
+      </section>
+      <!-- TODO: reserve later panels for image, logs, tuning, and command controls. -->
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const MQTT_PORT = 9001;
+      const MAX_POINTS = 200;
+      const RAW_LIMIT = 80;
+      const RECONNECT_MS = 2000;
+
+      const brokerHostInput = document.getElementById("broker-host");
+      const robotIdInput = document.getElementById("robot-id");
+      const connectButton = document.getElementById("connect");
+      const disconnectButton = document.getElementById("disconnect");
+      const statusDot = document.getElementById("status-dot");
+      const statusLabel = document.getElementById("status-label");
+      const rawLog = document.getElementById("raw-log");
+      const chart = echarts.init(document.getElementById("chart"));
+
+      let client = null;
+      let currentTopic = "";
+      const rawEntries = [];
+      const fieldSeries = new Map();
+
+      brokerHostInput.value = window.location.hostname || "localhost";
+
+      chart.setOption({
+        animation: false,
+        color: ["#2563eb", "#16a34a", "#f97316", "#7c3aed", "#0891b2", "#dc2626", "#4b5563"],
+        tooltip: {
+          trigger: "axis"
+        },
+        legend: {
+          type: "scroll",
+          top: 0,
+          data: []
+        },
+        grid: {
+          top: 48,
+          right: 24,
+          bottom: 46,
+          left: 58
+        },
+        xAxis: {
+          type: "time",
+          boundaryGap: false
+        },
+        yAxis: {
+          type: "value",
+          scale: true
+        },
+        series: []
+      });
+
+      window.addEventListener("resize", () => chart.resize());
+      connectButton.addEventListener("click", connect);
+      disconnectButton.addEventListener("click", disconnect);
+
+      function setStatus(isConnected, label) {
+        statusDot.classList.toggle("online", isConnected);
+        statusLabel.textContent = label;
+      }
+
+      function setControls(isActive) {
+        connectButton.disabled = isActive;
+        disconnectButton.disabled = !isActive;
+        brokerHostInput.disabled = isActive;
+        robotIdInput.disabled = isActive;
+      }
+
+      function appendRaw(entry) {
+        rawEntries.push(entry);
+        while (rawEntries.length > RAW_LIMIT) {
+          rawEntries.shift();
+        }
+        rawLog.textContent = rawEntries.join("\n\n");
+        rawLog.scrollTop = rawLog.scrollHeight;
+      }
+
+      function buildUrl() {
+        const host = brokerHostInput.value.trim() || window.location.hostname || "localhost";
+        brokerHostInput.value = host;
+        return `ws://${host}:${MQTT_PORT}`;
+      }
+
+      function buildTopic() {
+        const robotId = robotIdInput.value.trim() || "myrobot";
+        robotIdInput.value = robotId;
+        return `${robotId}/data`;
+      }
+
+      function connect() {
+        if (client) {
+          client.end(true);
+          client = null;
+        }
+
+        const url = buildUrl();
+        currentTopic = buildTopic();
+        setControls(true);
+        setStatus(false, "Connecting");
+        appendRaw(`[system] connecting ${url}, subscribing ${currentTopic}`);
+
+        try {
+          client = mqtt.connect(url, {
+            clean: true,
+            clientId: `spvision_dashboard_${Math.random().toString(16).slice(2)}`,
+            connectTimeout: 4000,
+            reconnectPeriod: RECONNECT_MS
+          });
+        } catch (error) {
+          client = null;
+          setControls(false);
+          setStatus(false, "Disconnected");
+          appendRaw(`[error] ${error.message}`);
+          return;
+        }
+
+        client.on("connect", () => {
+          setStatus(true, "Connected");
+          appendRaw(`[system] connected ${currentTopic}`);
+          client.subscribe(currentTopic, { qos: 0 }, (error) => {
+            if (error) {
+              appendRaw(`[error] subscribe ${currentTopic}: ${error.message}`);
+              return;
+            }
+            appendRaw(`[system] subscribed ${currentTopic}`);
+          });
+        });
+
+        client.on("reconnect", () => {
+          setStatus(false, "Reconnecting");
+        });
+
+        client.on("offline", () => {
+          setStatus(false, "Offline");
+        });
+
+        client.on("close", () => {
+          if (client) {
+            setStatus(false, "Disconnected");
+          }
+        });
+
+        client.on("error", (error) => {
+          setStatus(false, "Error");
+          appendRaw(`[error] ${error.message}`);
+        });
+
+        client.on("message", handleMessage);
+      }
+
+      function disconnect() {
+        if (!client) {
+          return;
+        }
+
+        const oldClient = client;
+        client = null;
+        currentTopic = "";
+        oldClient.end(true);
+        setControls(false);
+        setStatus(false, "Disconnected");
+        appendRaw("[system] disconnected");
+      }
+
+      function handleMessage(topic, payload) {
+        const text = payload.toString();
+        appendRaw(`[${new Date().toLocaleTimeString()}] ${topic}\n${text}`);
+
+        let message;
+        try {
+          message = JSON.parse(text);
+        } catch (error) {
+          appendRaw(`[error] invalid JSON: ${error.message}`);
+          return;
+        }
+
+        const values = getTelemetryValues(message);
+        if (!values) {
+          appendRaw("[error] payload.values must be an object");
+          return;
+        }
+
+        const timestamp = toTimestampMs(message.timestamp);
+        let changed = false;
+
+        for (const [key, value] of Object.entries(values)) {
+          const numericValue = Number(value);
+          if (!Number.isFinite(numericValue)) {
+            continue;
+          }
+
+          if (!fieldSeries.has(key)) {
+            fieldSeries.set(key, []);
+          }
+
+          const points = fieldSeries.get(key);
+          points.push([timestamp, numericValue]);
+          if (points.length > MAX_POINTS) {
+            points.splice(0, points.length - MAX_POINTS);
+          }
+          changed = true;
+        }
+
+        if (changed) {
+          renderChart();
+        }
+      }
+
+      function getTelemetryValues(message) {
+        if (message.values && typeof message.values === "object" && !Array.isArray(message.values)) {
+          return message.values;
+        }
+        if (message.fields && typeof message.fields === "object" && !Array.isArray(message.fields)) {
+          return message.fields;
+        }
+        return null;
+      }
+
+      function toTimestampMs(value) {
+        const timestamp = Number(value);
+        if (!Number.isFinite(timestamp)) {
+          return Date.now();
+        }
+        return timestamp > 100000000000 ? timestamp : timestamp * 1000;
+      }
+
+      function renderChart() {
+        const keys = Array.from(fieldSeries.keys());
+        chart.setOption({
+          legend: {
+            data: keys
+          },
+          series: keys.map((key) => ({
+            name: key,
+            type: "line",
+            showSymbol: false,
+            smooth: false,
+            data: fieldSeries.get(key),
+            emphasis: {
+              focus: "series"
+            }
+          }))
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
