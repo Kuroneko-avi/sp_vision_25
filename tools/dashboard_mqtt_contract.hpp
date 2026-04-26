@@ -14,7 +14,6 @@ namespace dashboard
 
 inline constexpr char TOPIC_DATA_SUFFIX[] = "data";
 inline constexpr char TOPIC_LOG_SUFFIX[] = "log";
-inline constexpr char TOPIC_IMAGE_SUFFIX[] = "image";
 inline constexpr char TOPIC_PARAMS_SCHEMA_SUFFIX[] = "params/schema";
 inline constexpr char TOPIC_PARAMS_CURRENT_SUFFIX[] = "params/current";
 inline constexpr char TOPIC_CONTROL_PARAM_SUFFIX[] = "control/param";
@@ -23,7 +22,6 @@ inline constexpr char TOPIC_CONTROL_ACK_SUFFIX[] = "control/ack";
 
 inline constexpr int QOS_DATA = 0;
 inline constexpr int QOS_LOG = 0;
-inline constexpr int QOS_IMAGE = 0;
 inline constexpr int QOS_PARAMS_SCHEMA = 0;
 inline constexpr int QOS_PARAMS_CURRENT = 0;
 inline constexpr int QOS_CONTROL_PARAM = 1;
@@ -49,11 +47,6 @@ inline std::string data_topic(const std::string & robot_id)
 inline std::string log_topic(const std::string & robot_id)
 {
   return make_topic(robot_id, TOPIC_LOG_SUFFIX);
-}
-
-inline std::string image_topic(const std::string & robot_id)
-{
-  return make_topic(robot_id, TOPIC_IMAGE_SUFFIX);
 }
 
 inline std::string params_schema_topic(const std::string & robot_id)
@@ -95,9 +88,6 @@ inline int qos_for_topic_suffix(const std::string & suffix)
   if (suffix == TOPIC_LOG_SUFFIX) {
     return QOS_LOG;
   }
-  if (suffix == TOPIC_IMAGE_SUFFIX) {
-    return QOS_IMAGE;
-  }
   if (suffix == TOPIC_PARAMS_SCHEMA_SUFFIX) {
     return QOS_PARAMS_SCHEMA;
   }
@@ -121,18 +111,6 @@ inline nlohmann::json make_log_payload(
 {
   return nlohmann::json{
     {"timestamp", timestamp}, {"level", level}, {"source", source}, {"message", message}};
-}
-
-inline nlohmann::json make_image_payload(
-  const std::string & format, int width, int height, const std::string & data_base64,
-  std::int64_t timestamp)
-{
-  return nlohmann::json{
-    {"timestamp", timestamp},
-    {"format", format},
-    {"width", width},
-    {"height", height},
-    {"data", data_base64}};
 }
 
 inline nlohmann::json make_number_param_schema(
@@ -256,14 +234,6 @@ inline bool validate_log_payload(const nlohmann::json & payload)
   return payload.is_object() && detail::has_integer(payload, "timestamp") &&
          detail::has_string(payload, "level") && detail::has_string(payload, "source") &&
          detail::has_string(payload, "message");
-}
-
-inline bool validate_image_payload(const nlohmann::json & payload)
-{
-  return payload.is_object() && detail::has_integer(payload, "timestamp") &&
-         detail::has_string(payload, "format") && payload.contains("width") &&
-         payload.at("width").is_number_integer() && payload.contains("height") &&
-         payload.at("height").is_number_integer() && detail::has_string(payload, "data");
 }
 
 inline bool validate_param_schema_entry(const nlohmann::json & entry)

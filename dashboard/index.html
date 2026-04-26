@@ -9,17 +9,23 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f5f7fb;
+      --bg: #eef2f7;
       --panel: #ffffff;
-      --text: #172033;
+      --panel-soft: #f8fafc;
+      --text: #182230;
       --muted: #667085;
-      --border: #d8dee9;
+      --border: #d0d7e2;
       --blue: #2563eb;
       --blue-dark: #1d4ed8;
-      --red: #dc2626;
       --green: #16a34a;
+      --red: #dc2626;
+      --amber: #d97706;
+      --cyan: #0891b2;
       --log-bg: #101828;
-      --log-text: #d0d5dd;
+      --log-debug: #98a2b3;
+      --log-info: #7dd3fc;
+      --log-warn: #facc15;
+      --log-error: #fca5a5;
     }
 
     * {
@@ -28,107 +34,128 @@
 
     body {
       margin: 0;
+      min-width: 320px;
       min-height: 100vh;
       background: var(--bg);
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
     }
 
     .app {
-      min-height: 100vh;
       display: grid;
       grid-template-rows: auto 1fr;
+      min-height: 100vh;
     }
 
     .topbar {
       display: flex;
       align-items: center;
       gap: 16px;
-      min-height: 68px;
-      padding: 12px 20px;
+      padding: 12px 16px;
       background: var(--panel);
       border-bottom: 1px solid var(--border);
       box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
     }
 
     .brand {
-      display: flex;
-      flex-direction: column;
+      display: grid;
       gap: 2px;
-      min-width: 174px;
+      min-width: 164px;
       line-height: 1.15;
     }
 
     .brand strong {
       font-size: 16px;
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .brand span {
       color: var(--muted);
       font-size: 12px;
+      font-weight: 650;
     }
 
-    .controls {
+    .connection-form {
       display: flex;
       align-items: end;
-      gap: 12px;
+      gap: 10px;
       flex: 1;
       flex-wrap: wrap;
     }
 
     label {
       display: grid;
-      gap: 6px;
+      gap: 5px;
+      min-width: 150px;
       color: var(--muted);
       font-size: 12px;
-      font-weight: 600;
-      min-width: 168px;
+      font-weight: 700;
     }
 
-    input {
+    .url-field {
+      min-width: min(360px, 100%);
+      flex: 1;
+    }
+
+    input,
+    select {
       width: 100%;
-      min-height: 38px;
+      min-height: 36px;
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 8px 10px;
+      padding: 7px 9px;
       color: var(--text);
       background: #fff;
-      font: inherit;
       outline: none;
     }
 
-    input:focus {
+    input[type="checkbox"] {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--blue);
+    }
+
+    input[type="range"] {
+      padding: 0;
+      accent-color: var(--blue);
+    }
+
+    input:focus,
+    select:focus {
       border-color: var(--blue);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
     }
 
-    input:disabled {
+    input:disabled,
+    select:disabled {
       color: #98a2b3;
       background: #f2f4f7;
     }
 
-    .actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 38px;
-    }
-
     button {
-      min-width: 108px;
-      min-height: 38px;
+      min-height: 36px;
+      min-width: 84px;
       border: 1px solid transparent;
       border-radius: 6px;
-      padding: 8px 14px;
-      font: inherit;
-      font-weight: 700;
+      padding: 7px 12px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.15;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     button.primary {
-      background: var(--blue);
       color: #fff;
+      background: var(--blue);
     }
 
     button.primary:hover:not(:disabled) {
@@ -137,12 +164,21 @@
 
     button.secondary {
       background: #fff;
-      color: var(--text);
       border-color: var(--border);
     }
 
     button.secondary:hover:not(:disabled) {
-      background: #f9fafb;
+      background: #f8fafc;
+    }
+
+    button.warning {
+      color: #fff;
+      background: var(--amber);
+    }
+
+    button.danger {
+      color: #fff;
+      background: var(--red);
     }
 
     button:disabled {
@@ -150,14 +186,23 @@
       opacity: 0.55;
     }
 
+    .top-actions,
+    .panel-actions,
+    .command-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
     .status {
       display: flex;
       align-items: center;
       gap: 8px;
-      min-width: 152px;
+      min-width: 142px;
       color: var(--muted);
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 800;
       white-space: nowrap;
     }
 
@@ -176,98 +221,288 @@
 
     main {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
-      gap: 16px;
-      padding: 16px;
+      grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.8fr);
+      gap: 12px;
       min-height: 0;
+      padding: 12px;
     }
 
-    .chart-panel,
-    .raw-panel {
+    .stack {
+      display: grid;
+      align-content: start;
+      gap: 12px;
       min-width: 0;
-      min-height: 0;
+    }
+
+    .panel {
+      min-width: 0;
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 8px;
       box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+      overflow: hidden;
     }
 
-    .chart-panel {
-      display: grid;
-      grid-template-rows: auto 1fr;
-      padding: 16px;
+    .panel header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
     }
 
     .panel-title {
-      margin: 0 0 12px;
-      font-size: 15px;
-      font-weight: 800;
+      margin: 0;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 850;
       line-height: 1.2;
+    }
+
+    .panel-meta,
+    .current-value,
+    .ack-time {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .chart-body {
+      padding: 8px 10px 12px;
     }
 
     #chart {
       width: 100%;
-      min-height: 420px;
+      min-height: 390px;
     }
 
-    .raw-panel {
+    .metrics {
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--panel-soft);
+    }
+
+    .metric {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .metric strong {
+      min-width: 0;
       overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 16px;
+      font-weight: 850;
+      white-space: nowrap;
     }
 
-    .raw-panel header {
-      padding: 16px 16px 12px;
-      border-bottom: 1px solid var(--border);
+    .empty-state {
+      padding: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
     }
 
-    #raw-log {
-      margin: 0;
-      padding: 14px 16px;
+    .param-list {
+      display: grid;
+      gap: 10px;
+      max-height: 500px;
       overflow: auto;
-      background: var(--log-bg);
-      color: var(--log-text);
-      font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-      white-space: pre-wrap;
-      word-break: break-word;
+      padding: 12px 14px;
     }
 
-    @media (max-width: 880px) {
+    .param-group {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .param-group-title {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .param-row {
+      display: grid;
+      grid-template-columns: minmax(132px, 0.85fr) minmax(170px, 1.2fr) auto;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 8px;
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .param-name,
+    .ack-id {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .param-inputs {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(76px, 112px);
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .param-inputs.single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .bool-input {
+      display: flex;
+      align-items: center;
+      min-height: 36px;
+    }
+
+    .param-status {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .log-body,
+    .ack-list {
+      max-height: 330px;
+      overflow: auto;
+      padding: 10px 12px;
+      background: var(--log-bg);
+    }
+
+    .log-entry {
+      display: grid;
+      grid-template-columns: 78px 52px minmax(0, 1fr);
+      gap: 8px;
+      padding: 3px 0;
+      color: var(--log-info);
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+        monospace;
+    }
+
+    .log-entry.debug {
+      color: var(--log-debug);
+    }
+
+    .log-entry.info {
+      color: var(--log-info);
+    }
+
+    .log-entry.warn {
+      color: var(--log-warn);
+    }
+
+    .log-entry.error,
+    .log-entry.critical {
+      color: var(--log-error);
+    }
+
+    .log-message {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: inherit;
+    }
+
+    .command-body {
+      display: grid;
+      gap: 10px;
+      padding: 12px 14px;
+    }
+
+    .ack-list {
+      display: grid;
+      gap: 8px;
+      background: #fff;
+    }
+
+    .ack-item {
+      display: grid;
+      gap: 4px;
+      padding: 8px;
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--green);
+      border-radius: 6px;
+    }
+
+    .ack-item.fail {
+      border-left-color: var(--red);
+    }
+
+    .ack-message {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 1080px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
       .topbar {
         align-items: stretch;
         flex-direction: column;
       }
 
-      .brand {
-        min-width: 0;
-      }
-
-      .controls {
-        align-items: stretch;
-      }
-
+      .brand,
+      .connection-form,
       label,
-      .actions,
-      .status {
-        width: 100%;
+      .status,
+      .top-actions {
         min-width: 0;
+        width: 100%;
       }
 
-      .actions {
+      .top-actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
       }
 
-      button {
-        min-width: 0;
+      .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      main {
+      .param-row {
         grid-template-columns: 1fr;
       }
 
+      .param-row button {
+        width: 100%;
+      }
+
+      .log-entry {
+        grid-template-columns: 70px minmax(0, 1fr);
+      }
+
+      .log-level {
+        display: none;
+      }
+
       #chart {
-        min-height: 340px;
+        min-height: 320px;
       }
     }
   </style>
@@ -277,18 +512,18 @@
     <header class="topbar">
       <div class="brand">
         <strong>MQTT Dashboard</strong>
-        <span>SP Vision Probe</span>
+        <span>SP Vision Control</span>
       </div>
-      <div class="controls">
-        <label>
-          Broker Host
-          <input id="broker-host" autocomplete="off" spellcheck="false">
+      <div class="connection-form">
+        <label class="url-field">
+          Broker URL
+          <input id="broker-url" autocomplete="off" spellcheck="false">
         </label>
         <label>
           Robot ID
           <input id="robot-id" autocomplete="off" spellcheck="false" value="myrobot">
         </label>
-        <div class="actions">
+        <div class="top-actions">
           <button id="connect" class="primary" type="button">Connect</button>
           <button id="disconnect" class="secondary" type="button" disabled>Disconnect</button>
         </div>
@@ -300,42 +535,139 @@
     </header>
 
     <main>
-      <section class="chart-panel" aria-label="MQTT numeric fields chart">
-        <h1 class="panel-title">Numeric Fields</h1>
-        <div id="chart"></div>
-      </section>
-      <section class="raw-panel" aria-label="Raw MQTT messages">
-        <header>
-          <h2 class="panel-title">Raw Messages</h2>
-        </header>
-        <pre id="raw-log"></pre>
-      </section>
-      <!-- TODO: reserve later panels for image, logs, tuning, and command controls. -->
+      <div class="stack">
+        <section class="panel" aria-label="Telemetry chart">
+          <header>
+            <h1 class="panel-title">Telemetry</h1>
+            <span id="telemetry-topic" class="panel-meta">myrobot/data</span>
+          </header>
+          <div class="chart-body">
+            <div id="chart"></div>
+          </div>
+          <div class="metrics">
+            <div class="metric">
+              <span>Samples</span>
+              <strong id="sample-count">0</strong>
+            </div>
+            <div class="metric">
+              <span>Series</span>
+              <strong id="series-count">0</strong>
+            </div>
+            <div class="metric">
+              <span>Last Data</span>
+              <strong id="last-data-time">-</strong>
+            </div>
+            <div class="metric">
+              <span>Source</span>
+              <strong id="telemetry-source">values</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-label="Parameter controls">
+          <header>
+            <h2 class="panel-title">Params</h2>
+            <span id="params-meta" class="panel-meta">schema pending</span>
+          </header>
+          <div id="params-list" class="param-list">
+            <div class="empty-state">No schema received</div>
+          </div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="panel" aria-label="Dashboard commands">
+          <header>
+            <h2 class="panel-title">Commands</h2>
+            <span id="command-topic" class="panel-meta">myrobot/control/cmd</span>
+          </header>
+          <div class="command-body">
+            <div class="command-row">
+              <button class="danger command-button" type="button" data-command="stop_dashboard">
+                stop_dashboard
+              </button>
+              <button class="primary command-button" type="button" data-command="start_dashboard">
+                start_dashboard
+              </button>
+              <button class="secondary command-button" type="button" data-command="republish_params">
+                republish_params
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-label="Control acknowledgements">
+          <header>
+            <h2 class="panel-title">Ack</h2>
+            <span id="ack-topic" class="panel-meta">myrobot/control/ack</span>
+          </header>
+          <div id="ack-list" class="ack-list">
+            <div class="empty-state">No ack</div>
+          </div>
+        </section>
+
+        <section class="panel" aria-label="Runtime logs">
+          <header>
+            <h2 class="panel-title">Log</h2>
+            <div class="panel-actions">
+              <button id="toggle-log-scroll" class="secondary" type="button">Pause</button>
+              <button id="clear-log" class="secondary" type="button">Clear</button>
+            </div>
+          </header>
+          <div id="log-list" class="log-body">
+            <div class="empty-state">No logs</div>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
 
   <script>
     (() => {
       const MQTT_PORT = 9001;
+      const DEFAULT_ROBOT_ID = "myrobot";
       const MAX_POINTS = 200;
-      const RAW_LIMIT = 80;
+      const MAX_LOGS = 500;
+      const MAX_ACKS = 20;
       const RECONNECT_MS = 2000;
 
-      const brokerHostInput = document.getElementById("broker-host");
+      const brokerUrlInput = document.getElementById("broker-url");
       const robotIdInput = document.getElementById("robot-id");
       const connectButton = document.getElementById("connect");
       const disconnectButton = document.getElementById("disconnect");
       const statusDot = document.getElementById("status-dot");
       const statusLabel = document.getElementById("status-label");
-      const rawLog = document.getElementById("raw-log");
+      const telemetryTopicLabel = document.getElementById("telemetry-topic");
+      const commandTopicLabel = document.getElementById("command-topic");
+      const ackTopicLabel = document.getElementById("ack-topic");
+      const sampleCountLabel = document.getElementById("sample-count");
+      const seriesCountLabel = document.getElementById("series-count");
+      const lastDataTimeLabel = document.getElementById("last-data-time");
+      const telemetrySourceLabel = document.getElementById("telemetry-source");
+      const paramsMeta = document.getElementById("params-meta");
+      const paramsList = document.getElementById("params-list");
+      const ackList = document.getElementById("ack-list");
+      const logList = document.getElementById("log-list");
+      const toggleLogScrollButton = document.getElementById("toggle-log-scroll");
+      const clearLogButton = document.getElementById("clear-log");
+      const commandButtons = Array.from(document.querySelectorAll(".command-button"));
       const chart = echarts.init(document.getElementById("chart"));
 
       let client = null;
-      let currentTopic = "";
-      const rawEntries = [];
+      let activeRobotId = DEFAULT_ROBOT_ID;
+      let topics = buildTopics(activeRobotId);
+      let logScrollPaused = false;
+      let totalSamples = 0;
       const fieldSeries = new Map();
+      const paramEntries = new Map();
+      const paramControls = new Map();
+      const currentParamValues = new Map();
+      const logEntries = [];
+      const ackEntries = [];
 
-      brokerHostInput.value = window.location.hostname || "localhost";
+      brokerUrlInput.value = defaultBrokerUrl();
+      robotIdInput.value = DEFAULT_ROBOT_ID;
+      updateTopicLabels();
 
       chart.setOption({
         animation: false,
@@ -349,10 +681,10 @@
           data: []
         },
         grid: {
-          top: 48,
-          right: 24,
-          bottom: 46,
-          left: 58
+          top: 46,
+          right: 18,
+          bottom: 44,
+          left: 54
         },
         xAxis: {
           type: "time",
@@ -368,6 +700,58 @@
       window.addEventListener("resize", () => chart.resize());
       connectButton.addEventListener("click", connect);
       disconnectButton.addEventListener("click", disconnect);
+      robotIdInput.addEventListener("input", previewTopics);
+      commandButtons.forEach((button) => {
+        button.addEventListener("click", () => publishCommand(button.dataset.command));
+      });
+      toggleLogScrollButton.addEventListener("click", () => {
+        logScrollPaused = !logScrollPaused;
+        toggleLogScrollButton.textContent = logScrollPaused ? "Resume" : "Pause";
+        if (!logScrollPaused) {
+          scrollLogsToBottom();
+        }
+      });
+      clearLogButton.addEventListener("click", () => {
+        logEntries.length = 0;
+        renderLogs();
+      });
+
+      function defaultBrokerUrl() {
+        const host = window.location.hostname || "localhost";
+        return `ws://${host}:${MQTT_PORT}`;
+      }
+
+      function sanitizeRobotId(value) {
+        const robotId = value.trim() || DEFAULT_ROBOT_ID;
+        return robotId.replace(/[\/+#]/g, "_");
+      }
+
+      function buildTopics(robotId) {
+        return {
+          data: `${robotId}/data`,
+          log: `${robotId}/log`,
+          paramsSchema: `${robotId}/params/schema`,
+          paramsCurrent: `${robotId}/params/current`,
+          controlParam: `${robotId}/control/param`,
+          controlCmd: `${robotId}/control/cmd`,
+          controlAck: `${robotId}/control/ack`
+        };
+      }
+
+      function previewTopics() {
+        if (client) {
+          return;
+        }
+        activeRobotId = sanitizeRobotId(robotIdInput.value);
+        topics = buildTopics(activeRobotId);
+        updateTopicLabels();
+      }
+
+      function updateTopicLabels() {
+        telemetryTopicLabel.textContent = topics.data;
+        commandTopicLabel.textContent = topics.controlCmd;
+        ackTopicLabel.textContent = topics.controlAck;
+      }
 
       function setStatus(isConnected, label) {
         statusDot.classList.toggle("online", isConnected);
@@ -377,29 +761,14 @@
       function setControls(isActive) {
         connectButton.disabled = isActive;
         disconnectButton.disabled = !isActive;
-        brokerHostInput.disabled = isActive;
+        brokerUrlInput.disabled = isActive;
         robotIdInput.disabled = isActive;
-      }
-
-      function appendRaw(entry) {
-        rawEntries.push(entry);
-        while (rawEntries.length > RAW_LIMIT) {
-          rawEntries.shift();
-        }
-        rawLog.textContent = rawEntries.join("\n\n");
-        rawLog.scrollTop = rawLog.scrollHeight;
-      }
-
-      function buildUrl() {
-        const host = brokerHostInput.value.trim() || window.location.hostname || "localhost";
-        brokerHostInput.value = host;
-        return `ws://${host}:${MQTT_PORT}`;
-      }
-
-      function buildTopic() {
-        const robotId = robotIdInput.value.trim() || "myrobot";
-        robotIdInput.value = robotId;
-        return `${robotId}/data`;
+        commandButtons.forEach((button) => {
+          button.disabled = !isActive;
+        });
+        paramControls.forEach(({ apply }) => {
+          apply.disabled = !isActive;
+        });
       }
 
       function connect() {
@@ -408,11 +777,15 @@
           client = null;
         }
 
-        const url = buildUrl();
-        currentTopic = buildTopic();
+        const url = brokerUrlInput.value.trim() || defaultBrokerUrl();
+        activeRobotId = sanitizeRobotId(robotIdInput.value);
+        robotIdInput.value = activeRobotId;
+        brokerUrlInput.value = url;
+        topics = buildTopics(activeRobotId);
+        updateTopicLabels();
         setControls(true);
         setStatus(false, "Connecting");
-        appendRaw(`[system] connecting ${url}, subscribing ${currentTopic}`);
+        appendSystemLog("info", `connecting ${url}`);
 
         try {
           client = mqtt.connect(url, {
@@ -425,42 +798,43 @@
           client = null;
           setControls(false);
           setStatus(false, "Disconnected");
-          appendRaw(`[error] ${error.message}`);
+          appendSystemLog("error", error.message);
           return;
         }
 
-        client.on("connect", () => {
-          setStatus(true, "Connected");
-          appendRaw(`[system] connected ${currentTopic}`);
-          client.subscribe(currentTopic, { qos: 0 }, (error) => {
-            if (error) {
-              appendRaw(`[error] subscribe ${currentTopic}: ${error.message}`);
-              return;
-            }
-            appendRaw(`[system] subscribed ${currentTopic}`);
-          });
-        });
-
-        client.on("reconnect", () => {
-          setStatus(false, "Reconnecting");
-        });
-
-        client.on("offline", () => {
-          setStatus(false, "Offline");
-        });
-
+        client.on("connect", subscribeTopics);
+        client.on("reconnect", () => setStatus(false, "Reconnecting"));
+        client.on("offline", () => setStatus(false, "Offline"));
         client.on("close", () => {
           if (client) {
             setStatus(false, "Disconnected");
           }
         });
-
         client.on("error", (error) => {
           setStatus(false, "Error");
-          appendRaw(`[error] ${error.message}`);
+          appendSystemLog("error", error.message);
         });
-
         client.on("message", handleMessage);
+      }
+
+      function subscribeTopics() {
+        setStatus(true, "Connected");
+        appendSystemLog("info", `connected ${activeRobotId}`);
+
+        const subscriptions = {};
+        subscriptions[topics.data] = { qos: 0 };
+        subscriptions[topics.log] = { qos: 0 };
+        subscriptions[topics.paramsSchema] = { qos: 0 };
+        subscriptions[topics.paramsCurrent] = { qos: 0 };
+        subscriptions[topics.controlAck] = { qos: 1 };
+
+        client.subscribe(subscriptions, (error) => {
+          if (error) {
+            appendSystemLog("error", `subscribe failed: ${error.message}`);
+            return;
+          }
+          appendSystemLog("info", "subscriptions ready");
+        });
       }
 
       function disconnect() {
@@ -470,44 +844,51 @@
 
         const oldClient = client;
         client = null;
-        currentTopic = "";
         oldClient.end(true);
         setControls(false);
         setStatus(false, "Disconnected");
-        appendRaw("[system] disconnected");
+        appendSystemLog("info", "disconnected");
       }
 
       function handleMessage(topic, payload) {
-        const text = payload.toString();
-        appendRaw(`[${new Date().toLocaleTimeString()}] ${topic}\n${text}`);
-
         let message;
         try {
-          message = JSON.parse(text);
+          message = JSON.parse(payload.toString());
         } catch (error) {
-          appendRaw(`[error] invalid JSON: ${error.message}`);
+          appendSystemLog("error", `${topic}: invalid JSON: ${error.message}`);
           return;
         }
 
-        const values = getTelemetryValues(message);
-        if (!values) {
-          appendRaw("[error] payload.values must be an object");
+        if (topic === topics.data) {
+          handleTelemetry(message);
+        } else if (topic === topics.log) {
+          handleLog(message);
+        } else if (topic === topics.paramsSchema) {
+          handleParamSchema(message);
+        } else if (topic === topics.paramsCurrent) {
+          handleParamCurrent(message);
+        } else if (topic === topics.controlAck) {
+          handleAck(message);
+        }
+      }
+
+      function handleTelemetry(message) {
+        const telemetry = getTelemetryValues(message);
+        if (!telemetry.values) {
+          appendSystemLog("warn", "telemetry payload missing values/fields object");
           return;
         }
 
         const timestamp = toTimestampMs(message.timestamp);
         let changed = false;
-
-        for (const [key, value] of Object.entries(values)) {
+        for (const [key, value] of Object.entries(telemetry.values)) {
           const numericValue = Number(value);
           if (!Number.isFinite(numericValue)) {
             continue;
           }
-
           if (!fieldSeries.has(key)) {
             fieldSeries.set(key, []);
           }
-
           const points = fieldSeries.get(key);
           points.push([timestamp, numericValue]);
           if (points.length > MAX_POINTS) {
@@ -517,26 +898,21 @@
         }
 
         if (changed) {
+          totalSamples += 1;
+          telemetrySourceLabel.textContent = telemetry.source;
+          lastDataTimeLabel.textContent = formatTime(timestamp);
           renderChart();
         }
       }
 
       function getTelemetryValues(message) {
-        if (message.values && typeof message.values === "object" && !Array.isArray(message.values)) {
-          return message.values;
+        if (isPlainObject(message.values)) {
+          return { values: message.values, source: "values" };
         }
-        if (message.fields && typeof message.fields === "object" && !Array.isArray(message.fields)) {
-          return message.fields;
+        if (isPlainObject(message.fields)) {
+          return { values: message.fields, source: "fields" };
         }
-        return null;
-      }
-
-      function toTimestampMs(value) {
-        const timestamp = Number(value);
-        if (!Number.isFinite(timestamp)) {
-          return Date.now();
-        }
-        return timestamp > 100000000000 ? timestamp : timestamp * 1000;
+        return { values: null, source: "" };
       }
 
       function renderChart() {
@@ -556,7 +932,391 @@
             }
           }))
         });
+        sampleCountLabel.textContent = String(totalSamples);
+        seriesCountLabel.textContent = String(keys.length);
       }
+
+      function handleLog(message) {
+        const timestamp = toTimestampMs(message.timestamp);
+        const level = String(message.level || "info").toLowerCase();
+        const text = String(message.message || message.msg || JSON.stringify(message));
+        appendLog({
+          timestamp,
+          level,
+          message: text
+        });
+      }
+
+      function appendSystemLog(level, message) {
+        appendLog({
+          timestamp: Date.now(),
+          level,
+          message
+        });
+      }
+
+      function appendLog(entry) {
+        logEntries.push(entry);
+        while (logEntries.length > MAX_LOGS) {
+          logEntries.shift();
+        }
+        renderLogs();
+      }
+
+      function renderLogs() {
+        if (!logEntries.length) {
+          logList.innerHTML = '<div class="empty-state">No logs</div>';
+          return;
+        }
+
+        logList.innerHTML = "";
+        for (const entry of logEntries) {
+          const row = document.createElement("div");
+          const level = normalizeLogLevel(entry.level);
+          row.className = `log-entry ${level}`;
+          row.innerHTML = `
+            <span>${escapeHtml(formatTime(entry.timestamp))}</span>
+            <span class="log-level">${escapeHtml(level)}</span>
+            <span class="log-message">${escapeHtml(entry.message)}</span>
+          `;
+          logList.appendChild(row);
+        }
+
+        if (!logScrollPaused) {
+          scrollLogsToBottom();
+        }
+      }
+
+      function normalizeLogLevel(level) {
+        if (["debug", "info", "warn", "error", "critical"].includes(level)) {
+          return level;
+        }
+        if (level === "warning") {
+          return "warn";
+        }
+        return "info";
+      }
+
+      function scrollLogsToBottom() {
+        logList.scrollTop = logList.scrollHeight;
+      }
+
+      function handleParamSchema(message) {
+        const params = Array.isArray(message.params) ? message.params : [];
+        paramEntries.clear();
+        for (const param of params) {
+          if (!param || typeof param.key !== "string" || typeof param.type !== "string") {
+            continue;
+          }
+          const entry = { ...param };
+          if (currentParamValues.has(param.key)) {
+            entry.value = currentParamValues.get(param.key);
+          }
+          paramEntries.set(param.key, entry);
+        }
+        paramsMeta.textContent = `${paramEntries.size} params`;
+        renderParams();
+      }
+
+      function handleParamCurrent(message) {
+        if (!isPlainObject(message.values)) {
+          appendSystemLog("warn", "params/current payload missing values object");
+          return;
+        }
+
+        for (const [key, value] of Object.entries(message.values)) {
+          currentParamValues.set(key, value);
+          const entry = paramEntries.get(key);
+          if (entry) {
+            entry.value = value;
+          }
+          syncParamControl(key, value);
+        }
+        paramsMeta.textContent = `${Object.keys(message.values).length} current values`;
+      }
+
+      function renderParams() {
+        paramControls.clear();
+        paramsList.innerHTML = "";
+
+        if (!paramEntries.size) {
+          paramsList.innerHTML = '<div class="empty-state">No schema received</div>';
+          setControls(Boolean(client));
+          return;
+        }
+
+        const groups = new Map();
+        for (const entry of paramEntries.values()) {
+          const group = String(entry.group || "default");
+          if (!groups.has(group)) {
+            groups.set(group, []);
+          }
+          groups.get(group).push(entry);
+        }
+
+        for (const [group, entries] of groups) {
+          const groupNode = document.createElement("div");
+          groupNode.className = "param-group";
+          const title = document.createElement("div");
+          title.className = "param-group-title";
+          title.textContent = group;
+          groupNode.appendChild(title);
+
+          for (const entry of entries) {
+            groupNode.appendChild(createParamRow(entry));
+          }
+          paramsList.appendChild(groupNode);
+        }
+        setControls(Boolean(client));
+      }
+
+      function createParamRow(entry) {
+        const row = document.createElement("div");
+        row.className = "param-row";
+
+        const status = document.createElement("div");
+        status.className = "param-status";
+        const name = document.createElement("div");
+        name.className = "param-name";
+        name.textContent = entry.key;
+        const currentValue = document.createElement("div");
+        currentValue.className = "current-value";
+        currentValue.textContent = formatParamValue(entry.value, entry.unit);
+        status.append(name, currentValue);
+
+        const inputs = document.createElement("div");
+        inputs.className = "param-inputs";
+        const apply = document.createElement("button");
+        apply.className = "primary";
+        apply.type = "button";
+        apply.textContent = "Apply";
+
+        const controls = buildParamInputs(entry);
+        inputs.classList.toggle("single", controls.length === 1);
+        controls.forEach((control) => inputs.appendChild(control));
+        apply.addEventListener("click", () => publishParam(entry.key));
+
+        row.append(status, inputs, apply);
+        paramControls.set(entry.key, { entry, controls, currentValue, apply });
+        return row;
+      }
+
+      function buildParamInputs(entry) {
+        if (entry.type === "number") {
+          const range = document.createElement("input");
+          range.type = "range";
+          applyNumberBounds(range, entry);
+          range.value = numberOrDefault(entry.value, range.min || 0);
+
+          const number = document.createElement("input");
+          number.type = "number";
+          applyNumberBounds(number, entry);
+          number.value = range.value;
+
+          range.addEventListener("input", () => {
+            number.value = range.value;
+          });
+          number.addEventListener("input", () => {
+            if (number.value !== "") {
+              range.value = number.value;
+            }
+          });
+          return [range, number];
+        }
+
+        if (entry.type === "bool") {
+          const wrap = document.createElement("div");
+          wrap.className = "bool-input";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = Boolean(entry.value);
+          wrap.appendChild(checkbox);
+          return [wrap];
+        }
+
+        if (entry.type === "enum") {
+          const select = document.createElement("select");
+          const options = Array.isArray(entry.options) ? entry.options : [];
+          for (const option of options) {
+            const node = document.createElement("option");
+            node.value = String(option);
+            node.textContent = String(option);
+            select.appendChild(node);
+          }
+          select.value = String(entry.value ?? "");
+          return [select];
+        }
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = String(entry.value ?? "");
+        return [input];
+      }
+
+      function applyNumberBounds(input, entry) {
+        if (Number.isFinite(Number(entry.min))) {
+          input.min = String(entry.min);
+        }
+        if (Number.isFinite(Number(entry.max))) {
+          input.max = String(entry.max);
+        }
+        if (Number.isFinite(Number(entry.step))) {
+          input.step = String(entry.step);
+        } else {
+          input.step = "any";
+        }
+      }
+
+      function syncParamControl(key, value) {
+        const control = paramControls.get(key);
+        if (!control) {
+          return;
+        }
+        control.entry.value = value;
+        control.currentValue.textContent = formatParamValue(value, control.entry.unit);
+
+        if (control.entry.type === "number") {
+          for (const item of control.controls) {
+            item.value = String(value);
+          }
+        } else if (control.entry.type === "bool") {
+          const checkbox = control.controls[0].querySelector("input");
+          checkbox.checked = Boolean(value);
+        } else {
+          control.controls[0].value = String(value ?? "");
+        }
+      }
+
+      function publishParam(key) {
+        const control = paramControls.get(key);
+        if (!control) {
+          return;
+        }
+        const value = readParamValue(control);
+        if (control.entry.type === "number" && !Number.isFinite(value)) {
+          appendSystemLog("warn", `${key}: invalid number`);
+          return;
+        }
+        publishJson(topics.controlParam, {
+          request_id: makeRequestId("param"),
+          key,
+          value,
+          timestamp: Date.now()
+        }, 1);
+      }
+
+      function readParamValue(control) {
+        if (control.entry.type === "number") {
+          return Number(control.controls[1].value);
+        }
+        if (control.entry.type === "bool") {
+          return control.controls[0].querySelector("input").checked;
+        }
+        return control.controls[0].value;
+      }
+
+      function publishCommand(command) {
+        publishJson(topics.controlCmd, {
+          request_id: makeRequestId("cmd"),
+          command,
+          timestamp: Date.now()
+        }, 1);
+      }
+
+      function publishJson(topic, payload, qos) {
+        if (!client || !client.connected) {
+          appendSystemLog("warn", `not connected: ${topic}`);
+          return;
+        }
+        client.publish(topic, JSON.stringify(payload), { qos }, (error) => {
+          if (error) {
+            appendSystemLog("error", `publish ${topic}: ${error.message}`);
+            return;
+          }
+          appendSystemLog("debug", `published ${topic} ${payload.request_id}`);
+        });
+      }
+
+      function handleAck(message) {
+        const timestamp = toTimestampMs(message.timestamp);
+        ackEntries.unshift({
+          requestId: String(message.request_id || "-"),
+          ok: Boolean(message.ok),
+          message: String(message.message || message.reason || "-"),
+          timestamp
+        });
+        while (ackEntries.length > MAX_ACKS) {
+          ackEntries.pop();
+        }
+        renderAcks();
+      }
+
+      function renderAcks() {
+        if (!ackEntries.length) {
+          ackList.innerHTML = '<div class="empty-state">No ack</div>';
+          return;
+        }
+        ackList.innerHTML = "";
+        for (const ack of ackEntries) {
+          const node = document.createElement("div");
+          node.className = `ack-item ${ack.ok ? "" : "fail"}`;
+          node.innerHTML = `
+            <div class="ack-id">${escapeHtml(ack.requestId)} · ${ack.ok ? "ok" : "failed"}</div>
+            <div class="ack-message">${escapeHtml(ack.message)}</div>
+            <div class="ack-time">${escapeHtml(formatDateTime(ack.timestamp))}</div>
+          `;
+          ackList.appendChild(node);
+        }
+      }
+
+      function makeRequestId(prefix) {
+        const random = Math.random().toString(16).slice(2, 10);
+        return `${prefix}_${Date.now()}_${random}`;
+      }
+
+      function numberOrDefault(value, fallback) {
+        const number = Number(value);
+        return Number.isFinite(number) ? String(number) : String(fallback);
+      }
+
+      function formatParamValue(value, unit) {
+        const suffix = unit ? ` ${unit}` : "";
+        if (value === undefined || value === null) {
+          return `current: -${suffix}`;
+        }
+        return `current: ${String(value)}${suffix}`;
+      }
+
+      function isPlainObject(value) {
+        return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+      }
+
+      function toTimestampMs(value) {
+        const timestamp = Number(value);
+        if (!Number.isFinite(timestamp)) {
+          return Date.now();
+        }
+        return timestamp > 100000000000 ? timestamp : timestamp * 1000;
+      }
+
+      function formatTime(timestamp) {
+        return new Date(timestamp).toLocaleTimeString();
+      }
+
+      function formatDateTime(timestamp) {
+        return new Date(timestamp).toLocaleString();
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      setControls(false);
     })();
   </script>
 </body>

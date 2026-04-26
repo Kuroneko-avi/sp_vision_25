@@ -1,6 +1,6 @@
 # Dashboard MQTT Protocol
 
-本文件定义视觉程序、Dashboard 前端与后续 `MqttBridge` 共享的 MQTT topic 与 JSON payload 契约。第一阶段只固定协议，不要求集成到 `main.cpp`，也不定义 HTTP serve、Web terminal 或高帧率图像流。
+本文件定义视觉程序、Dashboard 前端与后续 `MqttBridge` 共享的 MQTT topic 与 JSON payload 契约。当前 Dashboard 只承载 telemetry、日志、参数和控制消息，不承载图像或视频流。
 
 ## Topic 命名
 
@@ -10,14 +10,13 @@
 | :--- | :--- | :---: | :--- |
 | `{robot_id}/data` | vision -> dashboard | 0 | JSON telemetry |
 | `{robot_id}/log` | vision -> dashboard | 0 | JSON log event |
-| `{robot_id}/image` | vision -> dashboard | 0 | JSON image envelope |
 | `{robot_id}/params/schema` | vision -> dashboard | 0 | JSON parameter schema |
 | `{robot_id}/params/current` | vision -> dashboard | 0 | JSON current parameter values |
 | `{robot_id}/control/param` | dashboard -> vision | 1 | JSON parameter update request |
 | `{robot_id}/control/cmd` | dashboard -> vision | 1 | JSON command request |
 | `{robot_id}/control/ack` | vision -> dashboard | 1 | JSON request acknowledgement |
 
-QoS 0 用于状态、日志、图像和参数快照，允许丢包并由下一帧或下一次发布覆盖。QoS 1 用于控制请求和响应，确保 Dashboard 与视觉侧都能基于 `request_id` 做幂等处理。
+QoS 0 用于状态、日志和参数快照，允许丢包并由下一帧或下一次发布覆盖。QoS 1 用于控制请求和响应，确保 Dashboard 与视觉侧都能基于 `request_id` 做幂等处理。
 
 ## Payload 通用规则
 
@@ -56,22 +55,6 @@ QoS 0 用于状态、日志、图像和参数快照，允许丢包并由下一�
 ```
 
 `level` 建议使用 `trace`、`debug`、`info`、`warn`、`error`、`critical`。
-
-## `{robot_id}/image`
-
-第一阶段只定义低频图像 envelope，不定义高帧率 MJPEG。`data` 为 base64 编码后的图像数据。
-
-```json
-{
-  "timestamp": 1770000000000,
-  "format": "jpeg",
-  "width": 1280,
-  "height": 720,
-  "data": "/9j/..."
-}
-```
-
-`format` 建议使用 `jpeg` 或 `png`。
 
 ## `{robot_id}/params/schema`
 

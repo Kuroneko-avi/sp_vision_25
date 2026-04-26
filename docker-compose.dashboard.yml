@@ -1,0 +1,11 @@
+services:
+  dashboard-smoke:
+    build:
+      context: .
+      dockerfile: docker/dashboard/Dockerfile
+    environment:
+      ROBOT_ID: ${ROBOT_ID:-myrobot}
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+      - "8080:8080"
