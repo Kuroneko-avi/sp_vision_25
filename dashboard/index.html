@@ -1312,17 +1312,6 @@
         series: []
       });
 
-      chart.on("legendselectchanged", (event) => {
-        for (const [key, selected] of Object.entries(event.selected || {})) {
-          if (selected) {
-            hiddenTelemetrySeries.delete(key);
-          } else {
-            hiddenTelemetrySeries.add(key);
-          }
-        }
-        renderSeriesFilter(Array.from(fieldSeries.keys()));
-      });
-
       window.addEventListener("resize", () => chart.resize());
       connectButton.addEventListener("click", connect);
       disconnectButton.addEventListener("click", disconnect);
@@ -1646,6 +1635,7 @@
             type: "line",
             showSymbol: false,
             smooth: false,
+            show: !hiddenTelemetrySeries.has(key),
             data: fieldSeries.get(key),
             emphasis: {
               focus: "series"
