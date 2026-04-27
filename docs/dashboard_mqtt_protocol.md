@@ -148,11 +148,13 @@ Dashboard 请求视觉侧执行命令。`args` 为命令参数对象，无参数
 ```json
 {
   "request_id": "3d37909b-3c14-45e8-bb62-4b4b301f9a13",
-  "cmd": "snapshot",
+  "command": "snapshot",
   "args": {},
   "timestamp": 1770000000000
 }
 ```
+
+`args` 可省略；视觉侧收到缺省 `args` 时必须按空对象 `{}` 处理。
 
 命令集合由后续 `MqttBridge` 或业务接入层扩展，本阶段只固定 envelope。
 

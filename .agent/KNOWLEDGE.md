@@ -654,7 +654,14 @@ auto buff_plan = buff_aimer.mpc_aim(target_copy, t, gs, true);
 - **打符参数**：`buff_aimer` 配置节。
 - **通信参数**：`com_port`、`quaternion_canid`、`bullet_speed_canid`、`send_canid`。
 
-### 9.3 构建与运行命令
+### 9.3 Dashboard 热参数接口
+- **模型入口**：`tools::dashboard::DashboardParams` 生成 `params/schema` 与 `params/current` payload，并校验单个参数更新请求。
+- **MQTT 发布接口**：完整 `params/schema`、`params/current` envelope 由 `MqttBridge::publish_params_schema_payload()` 与 `MqttBridge::publish_params_current_payload()` 发布。
+- **可热改范围**：仅包含 `planner.yaw_offset_deg`、`planner.pitch_offset_deg`、`planner.fire_thresh`、`planner.decision_speed`、`planner.high_speed_delay_time`、`planner.low_speed_delay_time`、`buff.yaw_offset_deg`、`buff.pitch_offset_deg`、`buff.fire_gap_time`、`buff.predict_time`。
+- **线程安全接口**：`auto_aim::Planner::get_hot_params()` / `apply_hot_param()` 与 `auto_buff::Aimer::get_hot_params()` / `apply_hot_param()` 使用 mutex + RAII；offset 对外为 degree，内部仍存 rad。
+- **边界**：Dashboard 热调参不读取 MQTT，不依赖 Paho，不热改 TinyMPC `Q/R/max_acc`，不重建 solver。
+
+### 9.4 构建与运行命令
 ```bash
 # 构建发布版本
 cmake -B build -DCMAKE_BUILD_TYPE=Release && make -C build/ -j$(nproc)

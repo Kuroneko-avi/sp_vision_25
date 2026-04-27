@@ -11,6 +11,8 @@
 - 2026-04-04 已完成一次全局上下文审计，`standard_mpc` 与 `auto_aim_debug_mpc` 的核心知识已同步到 `.agent/`。
 - 已沉淀的主题包括：标准 MPC 数据链路、调试模式 JSON 字段、坐标系系统、控制指令语义、下位机通信协议。
 - 2026-04-26 MQTT Dashboard 第二阶段 E/F 基线进入合并收尾：Docker smoke 与前端控制面板已对齐，协议裁剪为不承载图像或视频流。
+- 2026-04-26 MQTT Dashboard 第二阶段 H 已实现热调参模型与 Planner/Buff Aimer 线程安全 apply 接口；尚未接入 MQTT/Paho 或业务入口。
+- 2026-04-27 MQTT Dashboard 第二阶段 G/H 合并收口完成：`control/cmd` 统一使用 `command` 字段，`DashboardParams` 完整 payload 通过 `MqttBridge::*_payload` 接口发布，I 阶段可接入业务入口。
 - 当前没有明确进行中的功能任务；本文件现阶段主要承担“维护面板”和“回填入口”的作用。
 - 历史任务细节已归档到下文，不再在顶部重复展开。
 
@@ -51,6 +53,8 @@
 
 ## 6. 更新日志 (Changelog)
 - **2026-04-15**: 重构 `TODO.md` 结构，合并重复执行记录，改为“当前状态 + 当前待办 + 已完成归档 + 性能回填”布局。
+- **2026-04-27**: 完成 Dashboard G/H 合并审查与接口收口，保持不接入 `src/standard_mpc.cpp` 或 `src/auto_aim_debug_mpc.cpp`。
+- **2026-04-26**: 完成 Dashboard 热参数模型 H：新增 `DashboardParams`、Planner/Buff Aimer 热参数快照与单参数 apply，验证范围不包含 TinyMPC Q/R/max_acc 热修改。
 - **2026-04-15**: 将隐藏知识目录更名为 `.agent/`，并同步更新仓库内所有元规则与文档引用路径。
 - **2026-04-15**: 将仓库根 `AGENTS.md` 重写为精简的元规则入口文件，仅保留上下文加载顺序、知识路由与收尾同步要求。
 - **2026-04-04**: 完成一次全局架构审计，并沉淀标准链路、调试字段、坐标系、控制指令和通信协议等核心知识。

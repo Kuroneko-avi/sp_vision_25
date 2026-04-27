@@ -168,11 +168,17 @@ inline nlohmann::json make_control_param_payload(
 }
 
 inline nlohmann::json make_control_cmd_payload(
-  const std::string & request_id, const std::string & cmd, const nlohmann::json & args,
+  const std::string & request_id, const std::string & command, const nlohmann::json & args,
   std::int64_t timestamp)
 {
   return nlohmann::json{
-    {"request_id", request_id}, {"cmd", cmd}, {"args", args}, {"timestamp", timestamp}};
+    {"request_id", request_id}, {"command", command}, {"args", args}, {"timestamp", timestamp}};
+}
+
+inline nlohmann::json make_control_cmd_payload(
+  const std::string & request_id, const std::string & command, std::int64_t timestamp)
+{
+  return make_control_cmd_payload(request_id, command, nlohmann::json::object(), timestamp);
 }
 
 inline nlohmann::json make_control_ack_payload(
@@ -315,7 +321,8 @@ inline bool validate_control_param_payload(const nlohmann::json & payload)
 inline bool validate_control_cmd_payload(const nlohmann::json & payload)
 {
   return payload.is_object() && detail::has_string(payload, "request_id") &&
-         detail::has_string(payload, "cmd") && detail::has_object(payload, "args") &&
+         detail::has_string(payload, "command") &&
+         (!payload.contains("args") || detail::has_object(payload, "args")) &&
          detail::has_integer(payload, "timestamp");
 }
 
