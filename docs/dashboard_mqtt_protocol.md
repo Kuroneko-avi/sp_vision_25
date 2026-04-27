@@ -72,13 +72,17 @@ QoS 0 用于状态、日志和参数快照，允许丢包并由下一帧或下�
       "step": 100,
       "unit": "us",
       "group": "camera",
-      "value": 5000
+      "value": 5000,
+      "editable": true,
+      "restart_required": false
     },
     {
       "key": "tracker.enabled",
       "type": "bool",
       "group": "tracker",
-      "value": true
+      "value": true,
+      "editable": false,
+      "restart_required": true
     },
     {
       "key": "runtime.mode",
@@ -110,8 +114,14 @@ QoS 0 用于状态、日志和参数快照，允许丢包并由下一帧或下�
 | `group` | yes | Dashboard 分组名 |
 | `value` | yes | 当前值，类型必须与 `type` 匹配 |
 | `options` | enum only | `enum` 的可选字符串数组 |
+| `editable` | optional | `false` 表示 Dashboard 只展示，不发送 `control/param` |
+| `restart_required` | optional | `true` 表示当前值来自配置快照，修改需要重启或后续专门热更新链路 |
+| `render` | optional | 复合配置可用 `json`，Dashboard 按只读 JSON 文本展示 |
+| `source_key` | optional | 运行态别名对应的配置源键 |
 
 `options` 仅允许在 `type = "enum"` 时使用。`number` 的 `min`、`max`、`step` 可按参数需要提供；非 `number` 参数不使用这些字段。
+
+当前 MPC Dashboard 参数目录以 `configs/standard3.yaml` 为 source of truth 生成。已接入热更新链路的 Planner/Buff Aimer 参数会设置 `editable: true`，`params/current` 中的值来自运行态快照；其他标量、数组、矩阵和标定参数只展示 YAML 初值，设置 `editable: false` 与 `restart_required: true`。
 
 ## `{robot_id}/params/current`
 

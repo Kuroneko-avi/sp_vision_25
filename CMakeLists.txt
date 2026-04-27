@@ -32,6 +32,7 @@ add_library(dashboard_params STATIC tools/dashboard_params.cpp)
 target_link_libraries(dashboard_params
     PUBLIC
         nlohmann_json::nlohmann_json
+        yaml-cpp
         auto_aim
         auto_buff
         tools

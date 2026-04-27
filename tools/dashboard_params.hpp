@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <vector>
 
 namespace auto_aim
 {
@@ -69,15 +70,43 @@ public:
   DashboardParams(SnapshotReader read_snapshot, ParamWriter write_param, bool include_buff = true);
   explicit DashboardParams(auto_aim::Planner & planner);
   DashboardParams(auto_aim::Planner & planner, auto_buff::Aimer & buff_aimer);
+  DashboardParams(
+    const std::string & config_path, auto_aim::Planner & planner, bool include_buff = false);
+  DashboardParams(
+    const std::string & config_path, auto_aim::Planner & planner, auto_buff::Aimer & buff_aimer);
 
   nlohmann::json make_schema() const;
   nlohmann::json make_current(std::int64_t timestamp) const;
   DashboardParamResult apply(const std::string & key, const nlohmann::json & value) const;
 
+public:
+  struct ParamSpec
+  {
+    std::string key;
+    std::string local_key;
+    std::string group;
+    std::string type;
+    nlohmann::json value;
+    double DashboardParamSnapshot::*snapshot_value{nullptr};
+    bool editable{true};
+    bool restart_required{false};
+    bool render_json{false};
+    bool has_min{false};
+    bool has_max{false};
+    bool has_step{false};
+    double min{0.0};
+    double max{0.0};
+    double step{0.0};
+    std::string unit;
+    std::vector<std::string> options;
+    std::string source_key;
+  };
+
 private:
   SnapshotReader read_snapshot_;
   ParamWriter write_param_;
   bool include_buff_{true};
+  std::vector<ParamSpec> params_;
 };
 
 }  // namespace dashboard

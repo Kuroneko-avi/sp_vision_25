@@ -42,6 +42,8 @@ scripts/dashboard_hardwareless_smoke.sh
 
 The script starts the dashboard broker/http container, creates a virtual `/dev/gimbal` inside the dev container, runs `auto_aim_debug_mpc` with `--mock-runtime --video-source assets/demo/demo.avi --video-loop`, and verifies `data`, `params/schema`, `params/current`, and `control/ack`.
 
+The parameter panel is schema-driven. MPC entrypoints publish a catalog derived from `configs/standard3.yaml`: hot Planner/Buff Aimer fields are editable, while the remaining scalar, array, matrix, and calibration values are displayed as read-only restart-required configuration.
+
 Hardware entrypoints can be launched from the same container:
 
 ```bash

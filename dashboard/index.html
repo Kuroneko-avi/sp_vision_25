@@ -1,26 +1,35 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SP Vision MQTT Dashboard</title>
+  <title>SP Vision MQTT 控制台</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <style>
     :root {
       color-scheme: light;
-      --bg: #eef2f7;
+      --bg: #f3f6fb;
+      --bg-strong: #e8eef8;
       --panel: #ffffff;
       --panel-soft: #f8fafc;
-      --text: #182230;
+      --panel-tint: #eff6ff;
+      --text: #172033;
       --muted: #667085;
-      --border: #d0d7e2;
+      --subtle: #98a2b3;
+      --border: #d9e2ef;
+      --border-strong: #c9d4e5;
       --blue: #2563eb;
       --blue-dark: #1d4ed8;
       --green: #16a34a;
       --red: #dc2626;
       --amber: #d97706;
       --cyan: #0891b2;
+      --purple: #7c3aed;
+      --shadow: 0 16px 38px rgba(16, 24, 40, 0.08);
+      --shadow-soft: 0 3px 12px rgba(16, 24, 40, 0.06);
+      --radius: 18px;
+      --radius-sm: 12px;
       --log-bg: #101828;
       --log-debug: #98a2b3;
       --log-info: #7dd3fc;
@@ -32,14 +41,20 @@
       box-sizing: border-box;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       margin: 0;
       min-width: 320px;
       min-height: 100vh;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 32rem),
+        linear-gradient(180deg, var(--bg), #eef3fa 48%, var(--bg-strong));
       color: var(--text);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-        sans-serif;
+        "PingFang SC", "Microsoft YaHei", sans-serif;
     }
 
     button,
@@ -48,77 +63,112 @@
       font: inherit;
     }
 
+    button {
+      border: 0;
+    }
+
     .app {
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto auto 1fr;
       min-height: 100vh;
     }
 
     .topbar {
-      display: flex;
-      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: grid;
+      grid-template-columns: minmax(220px, 0.8fr) minmax(0, 2fr);
       gap: 16px;
-      padding: 12px 16px;
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
-      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+      padding: 16px clamp(14px, 2.2vw, 28px);
+      background: rgba(255, 255, 255, 0.88);
+      border-bottom: 1px solid rgba(217, 226, 239, 0.92);
+      box-shadow: 0 4px 18px rgba(16, 24, 40, 0.05);
+      backdrop-filter: blur(14px);
     }
 
     .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
       display: grid;
-      gap: 2px;
-      min-width: 164px;
-      line-height: 1.15;
+      place-items: center;
+      flex: 0 0 44px;
+      width: 44px;
+      height: 44px;
+      color: #fff;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      border-radius: 15px;
+      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.26);
+    }
+
+    .brand-text {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
     }
 
     .brand strong {
-      font-size: 16px;
-      font-weight: 800;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.1;
+      white-space: nowrap;
     }
 
     .brand span {
       color: var(--muted);
       font-size: 12px;
-      font-weight: 650;
+      font-weight: 700;
     }
 
     .connection-form {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(260px, 1.3fr) minmax(160px, 0.55fr) auto auto;
       align-items: end;
       gap: 10px;
-      flex: 1;
-      flex-wrap: wrap;
+      min-width: 0;
     }
 
     label {
       display: grid;
-      gap: 5px;
-      min-width: 150px;
+      gap: 6px;
+      min-width: 0;
       color: var(--muted);
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
     }
 
-    .url-field {
-      min-width: min(360px, 100%);
-      flex: 1;
+    .field-help {
+      color: var(--subtle);
+      font-size: 11px;
+      font-weight: 650;
     }
 
     input,
+    textarea,
     select {
       width: 100%;
-      min-height: 36px;
+      min-height: 40px;
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 7px 9px;
+      border-radius: 12px;
+      padding: 9px 11px;
       color: var(--text);
       background: #fff;
       outline: none;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
     }
 
     input[type="checkbox"] {
-      width: 18px;
-      min-height: 18px;
+      width: 20px;
+      min-height: 20px;
       accent-color: var(--blue);
     }
 
@@ -128,29 +178,39 @@
     }
 
     input:focus,
+    textarea:focus,
     select:focus {
       border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.13);
     }
 
     input:disabled,
+    textarea:disabled,
     select:disabled {
       color: #98a2b3;
       background: #f2f4f7;
     }
 
     button {
-      min-height: 36px;
-      min-width: 84px;
-      border: 1px solid transparent;
-      border-radius: 6px;
-      padding: 7px 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 40px;
+      border-radius: 12px;
+      padding: 9px 14px;
       color: var(--text);
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 850;
       line-height: 1.15;
       cursor: pointer;
       white-space: nowrap;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-soft);
     }
 
     button.primary {
@@ -164,7 +224,7 @@
 
     button.secondary {
       background: #fff;
-      border-color: var(--border);
+      border: 1px solid var(--border);
     }
 
     button.secondary:hover:not(:disabled) {
@@ -181,14 +241,25 @@
       background: var(--red);
     }
 
+    button.ghost {
+      min-height: 34px;
+      padding: 7px 10px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid transparent;
+    }
+
     button:disabled {
       cursor: not-allowed;
       opacity: 0.55;
+      transform: none;
+      box-shadow: none;
     }
 
     .top-actions,
     .panel-actions,
-    .command-row {
+    .command-row,
+    .filter-row {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -198,11 +269,17 @@
     .status {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      min-width: 142px;
+      min-width: 136px;
+      min-height: 40px;
+      padding: 0 12px;
       color: var(--muted);
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 900;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 999px;
       white-space: nowrap;
     }
 
@@ -221,131 +298,207 @@
 
     main {
       display: grid;
-      grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.8fr);
-      gap: 12px;
+      grid-template-columns: minmax(0, 1.42fr) minmax(360px, 0.8fr);
+      gap: 16px;
       min-height: 0;
-      padding: 12px;
+      padding: clamp(14px, 2.2vw, 28px);
     }
 
     .stack {
       display: grid;
       align-content: start;
-      gap: 12px;
+      gap: 16px;
       min-width: 0;
     }
 
     .panel {
       min-width: 0;
-      background: var(--panel);
+      background: rgba(255, 255, 255, 0.96);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
       overflow: hidden;
+    }
+
+    .panel.featured {
+      box-shadow: var(--shadow);
     }
 
     .panel header {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
-      gap: 10px;
-      padding: 12px 14px;
+      gap: 12px;
+      padding: 16px 18px;
       border-bottom: 1px solid var(--border);
+    }
+
+    .title-block {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
     }
 
     .panel-title {
       margin: 0;
       min-width: 0;
-      font-size: 14px;
-      font-weight: 850;
+      font-size: 16px;
+      font-weight: 900;
       line-height: 1.2;
     }
 
+    .panel-subtitle,
     .panel-meta,
     .current-value,
     .ack-time {
       color: var(--muted);
       font-size: 12px;
-      font-weight: 650;
+      font-weight: 700;
+    }
+
+    .topic-pill,
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      min-height: 28px;
+      padding: 5px 9px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .badge.good {
+      color: #0f7a36;
+      background: #ecfdf3;
+      border-color: #bbf7d0;
+    }
+
+    .badge.fail {
+      color: #b42318;
+      background: #fff1f3;
+      border-color: #fecdd3;
     }
 
     .chart-body {
-      padding: 8px 10px 12px;
+      padding: 10px 14px 16px;
     }
 
     #chart {
       width: 100%;
-      min-height: 390px;
+      min-height: 430px;
     }
 
     .metrics {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px;
-      padding: 12px 14px;
+      gap: 10px;
+      padding: 14px 18px 18px;
       border-top: 1px solid var(--border);
-      background: var(--panel-soft);
+      background: linear-gradient(180deg, #fff, var(--panel-soft));
     }
 
     .metric {
       display: grid;
-      gap: 2px;
+      gap: 6px;
       min-width: 0;
+      padding: 12px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
     }
 
     .metric span {
       color: var(--muted);
       font-size: 11px;
-      font-weight: 750;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
     }
 
     .metric strong {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
-      font-size: 16px;
-      font-weight: 850;
+      font-size: 18px;
+      font-weight: 950;
       white-space: nowrap;
     }
 
     .empty-state {
-      padding: 12px;
+      display: grid;
+      place-items: center;
+      min-height: 90px;
+      padding: 16px;
       color: var(--muted);
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 750;
       text-align: center;
+      background: repeating-linear-gradient(-45deg, #fff, #fff 10px, #f9fbfd 10px, #f9fbfd 20px);
+      border-radius: var(--radius-sm);
+    }
+
+    .param-toolbar {
+      display: grid;
+      gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-soft);
+    }
+
+    .filter-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .param-list {
       display: grid;
-      gap: 10px;
-      max-height: 500px;
+      gap: 14px;
+      max-height: 580px;
       overflow: auto;
-      padding: 12px 14px;
+      padding: 14px 18px 18px;
     }
 
     .param-group {
       display: grid;
-      gap: 8px;
+      gap: 10px;
       min-width: 0;
     }
 
     .param-group-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
       color: var(--muted);
       font-size: 12px;
-      font-weight: 850;
+      font-weight: 950;
       text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     .param-row {
       display: grid;
-      grid-template-columns: minmax(132px, 0.85fr) minmax(170px, 1.2fr) auto;
+      grid-template-columns: minmax(155px, 0.9fr) minmax(190px, 1.2fr) auto;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       min-width: 0;
-      padding: 8px;
-      background: var(--panel-soft);
+      padding: 12px;
+      background: #fff;
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 14px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    .param-row.dirty {
+      background: #fffbeb;
+      border-color: #fcd34d;
     }
 
     .param-name,
@@ -353,12 +506,19 @@
       min-width: 0;
       overflow-wrap: anywhere;
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 900;
+    }
+
+    .param-detail {
+      color: var(--subtle);
+      font-size: 11px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
     }
 
     .param-inputs {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(76px, 112px);
+      grid-template-columns: minmax(0, 1fr) minmax(82px, 112px);
       align-items: center;
       gap: 8px;
       min-width: 0;
@@ -368,33 +528,126 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
+    .param-json {
+      min-height: 72px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
     .bool-input {
       display: flex;
       align-items: center;
-      min-height: 36px;
+      gap: 10px;
+      min-height: 40px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
     }
 
     .param-status {
       display: grid;
-      gap: 2px;
+      gap: 4px;
       min-width: 0;
     }
 
-    .log-body,
+    .command-body {
+      display: grid;
+      gap: 12px;
+      padding: 16px 18px 18px;
+    }
+
+    .command-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .command-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    .command-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .command-card span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
     .ack-list {
+      display: grid;
+      gap: 10px;
       max-height: 330px;
       overflow: auto;
-      padding: 10px 12px;
+      padding: 12px 14px;
+      background: #fff;
+    }
+
+    .ack-item {
+      display: grid;
+      gap: 6px;
+      padding: 11px;
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      border-left: 5px solid var(--green);
+      border-radius: 14px;
+    }
+
+    .ack-item.fail {
+      border-left-color: var(--red);
+    }
+
+    .ack-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .ack-message {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 750;
+      line-height: 1.45;
+    }
+
+    .log-body {
+      max-height: 370px;
+      overflow: auto;
+      padding: 12px 14px;
       background: var(--log-bg);
+    }
+
+    .log-body .empty-state {
+      color: #d0d5dd;
+      background: transparent;
+      border: 1px dashed rgba(255, 255, 255, 0.16);
     }
 
     .log-entry {
       display: grid;
-      grid-template-columns: 78px 52px minmax(0, 1fr);
-      gap: 8px;
-      padding: 3px 0;
+      grid-template-columns: 88px 62px minmax(0, 1fr);
+      gap: 10px;
+      padding: 4px 0;
       color: var(--log-info);
-      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+      font: 12px/1.48 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
         monospace;
     }
 
@@ -421,58 +674,243 @@
       color: inherit;
     }
 
-    .command-body {
+    .toast-wrap {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 30;
       display: grid;
       gap: 10px;
+      width: min(360px, calc(100vw - 36px));
+      pointer-events: none;
+    }
+
+    .toast {
       padding: 12px 14px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.4;
+      background: rgba(16, 24, 40, 0.94);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      pointer-events: auto;
     }
 
-    .ack-list {
-      display: grid;
-      gap: 8px;
-      background: #fff;
+    .toast.warn {
+      background: rgba(180, 83, 9, 0.96);
     }
 
-    .ack-item {
+    .toast.error {
+      background: rgba(180, 35, 24, 0.96);
+    }
+
+
+
+    .workflow-strip {
       display: grid;
-      gap: 4px;
-      padding: 8px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      padding: 18px clamp(14px, 2.2vw, 28px) 0;
+    }
+
+    .workflow-card {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      padding: 13px 14px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .workflow-step {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 950;
+      background: var(--blue);
+      border-radius: 999px;
+    }
+
+    .workflow-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+      font-weight: 950;
+    }
+
+    .workflow-card span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .status.connecting .status-dot,
+    .status.reconnecting .status-dot {
+      background: var(--amber);
+      box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.14);
+    }
+
+    .status.error .status-dot {
+      background: var(--red);
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.14);
+    }
+
+    .status.online {
+      color: #0f7a36;
+      border-color: #bbf7d0;
+      background: #ecfdf3;
+    }
+
+    .status.connecting,
+    .status.reconnecting {
+      color: #92400e;
+      border-color: #fed7aa;
+      background: #fffbeb;
+    }
+
+    .status.error {
+      color: #b42318;
+      border-color: #fecdd3;
+      background: #fff1f3;
+    }
+
+    .param-changebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-top: 2px;
+      flex-wrap: wrap;
+    }
+
+    .change-count {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .change-count strong {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 950;
+    }
+
+    .param-row.pending {
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
+
+    .param-row.success {
+      background: #f0fdf4;
+      border-color: #86efac;
+    }
+
+    .param-row.fail {
+      background: #fff1f3;
+      border-color: #fda4af;
+    }
+
+    .param-state {
+      justify-self: start;
+      min-height: 24px;
+      padding: 4px 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
       background: var(--panel-soft);
       border: 1px solid var(--border);
-      border-left: 4px solid var(--green);
-      border-radius: 6px;
+      border-radius: 999px;
     }
 
-    .ack-item.fail {
-      border-left-color: var(--red);
+    .param-state.dirty {
+      color: #92400e;
+      background: #fffbeb;
+      border-color: #fcd34d;
     }
 
-    .ack-message {
-      min-width: 0;
-      overflow-wrap: anywhere;
+    .param-state.pending {
+      color: #1d4ed8;
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
+
+    .param-state.success {
+      color: #0f7a36;
+      background: #ecfdf3;
+      border-color: #86efac;
+    }
+
+    .param-state.fail {
+      color: #b42318;
+      background: #fff1f3;
+      border-color: #fda4af;
+    }
+
+    .param-state.readonly {
+      color: #475467;
+      background: #f2f4f7;
+      border-color: #d0d5dd;
+    }
+
+    .log-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .log-toolbar select {
+      width: auto;
+      min-width: 118px;
+      min-height: 34px;
+      padding-block: 6px;
+      font-size: 12px;
+    }
+
+    .empty-state strong {
+      display: block;
+      margin-bottom: 5px;
       color: var(--text);
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 950;
     }
 
-    @media (max-width: 1080px) {
+    .empty-state span {
+      display: block;
+      max-width: 420px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 1180px) {
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .workflow-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       main {
         grid-template-columns: 1fr;
       }
     }
 
-    @media (max-width: 760px) {
-      .topbar {
-        align-items: stretch;
-        flex-direction: column;
+    @media (max-width: 820px) {
+      .connection-form {
+        grid-template-columns: 1fr;
       }
 
-      .brand,
-      .connection-form,
-      label,
-      .status,
-      .top-actions {
-        min-width: 0;
+      .top-actions,
+      .status {
         width: 100%;
       }
 
@@ -489,12 +927,25 @@
         grid-template-columns: 1fr;
       }
 
-      .param-row button {
+      .param-row button,
+      .command-card button {
         width: 100%;
       }
 
+      .command-card {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-row {
+        grid-template-columns: 1fr;
+      }
+
+      .workflow-strip {
+        grid-template-columns: 1fr;
+      }
+
       .log-entry {
-        grid-template-columns: 70px minmax(0, 1fr);
+        grid-template-columns: 78px minmax(0, 1fr);
       }
 
       .log-level {
@@ -502,7 +953,27 @@
       }
 
       #chart {
-        min-height: 320px;
+        min-height: 340px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .topbar,
+      main {
+        padding-inline: 10px;
+      }
+
+      .brand strong {
+        font-size: 16px;
+      }
+
+      .panel header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .metrics {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -511,35 +982,66 @@
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <strong>MQTT Dashboard</strong>
-        <span>SP Vision Control</span>
+        <div class="brand-mark" aria-hidden="true">SP</div>
+        <div class="brand-text">
+          <strong>SP Vision 控制台</strong>
+          <span>MQTT 遥测 · 参数调试 · 运行日志</span>
+        </div>
       </div>
-      <div class="connection-form">
+
+      <div class="connection-form" aria-label="连接设置">
         <label class="url-field">
           Broker URL
-          <input id="broker-url" autocomplete="off" spellcheck="false">
+          <input id="broker-url" autocomplete="off" spellcheck="false" aria-describedby="broker-help">
+          <span id="broker-help" class="field-help">默认使用当前主机的 9001 WebSocket 端口</span>
         </label>
         <label>
           Robot ID
           <input id="robot-id" autocomplete="off" spellcheck="false" value="myrobot">
+          <span class="field-help">用于拼接 MQTT topic</span>
         </label>
         <div class="top-actions">
-          <button id="connect" class="primary" type="button">Connect</button>
-          <button id="disconnect" class="secondary" type="button" disabled>Disconnect</button>
+          <button id="connect" class="primary" type="button">连接</button>
+          <button id="disconnect" class="secondary" type="button" disabled>断开</button>
         </div>
         <div class="status" aria-live="polite">
           <span id="status-dot" class="status-dot" aria-hidden="true"></span>
-          <span id="status-label">Disconnected</span>
+          <span id="status-label">未连接</span>
         </div>
       </div>
     </header>
 
+    <section class="workflow-strip" aria-label="使用流程">
+      <div class="workflow-card">
+        <div class="workflow-step">1</div>
+        <div><strong>连接 Broker</strong><span>确认 WebSocket 地址与 Robot ID，连接后自动订阅全部 topic。</span></div>
+      </div>
+      <div class="workflow-card">
+        <div class="workflow-step">2</div>
+        <div><strong>观察遥测</strong><span>实时曲线用于看趋势；需要重新开始分析时可清空曲线。</span></div>
+      </div>
+      <div class="workflow-card">
+        <div class="workflow-step">3</div>
+        <div><strong>调整参数</strong><span>修改后进入“待应用”状态，可单独应用或批量应用。</span></div>
+      </div>
+      <div class="workflow-card">
+        <div class="workflow-step">4</div>
+        <div><strong>检查回执</strong><span>每次命令/调参都会在回执和日志中留下可追踪记录。</span></div>
+      </div>
+    </section>
+
     <main>
       <div class="stack">
-        <section class="panel" aria-label="Telemetry chart">
+        <section class="panel featured" aria-label="遥测曲线">
           <header>
-            <h1 class="panel-title">Telemetry</h1>
-            <span id="telemetry-topic" class="panel-meta">myrobot/data</span>
+            <div class="title-block">
+              <h1 class="panel-title">遥测曲线</h1>
+              <span class="panel-subtitle">实时绘制数值字段，适合观察 yaw、pitch、fps、误差等连续量。</span>
+            </div>
+            <div class="panel-actions">
+              <span id="telemetry-topic" class="topic-pill">myrobot/data</span>
+              <button id="clear-chart" class="secondary" type="button">清空曲线</button>
+            </div>
           </header>
           <div class="chart-body">
             <div id="chart"></div>
@@ -564,63 +1066,110 @@
           </div>
         </section>
 
-        <section class="panel" aria-label="Parameter controls">
+        <section class="panel" aria-label="参数控制">
           <header>
-            <h2 class="panel-title">Params</h2>
-            <span id="params-meta" class="panel-meta">schema pending</span>
+            <div class="title-block">
+              <h2 class="panel-title">参数控制</h2>
+              <span class="panel-subtitle">根据 params/schema 自动生成控件，修改后点击“应用”。</span>
+            </div>
+            <span id="params-meta" class="topic-pill">等待 schema</span>
           </header>
+          <div class="param-toolbar">
+            <div class="filter-row">
+              <input id="param-filter" type="search" placeholder="搜索参数名、分组或类型..." autocomplete="off">
+              <button id="reset-param-filter" class="secondary" type="button">重置搜索</button>
+            </div>
+            <div class="param-changebar" aria-live="polite">
+              <span id="dirty-param-count" class="change-count">待应用：<strong>0</strong></span>
+              <div class="panel-actions">
+                <button id="apply-dirty-params" class="primary" type="button" disabled>应用全部修改</button>
+                <button id="reset-dirty-params" class="secondary" type="button" disabled>撤销修改</button>
+              </div>
+            </div>
+          </div>
           <div id="params-list" class="param-list">
-            <div class="empty-state">No schema received</div>
+            <div class="empty-state"><div><strong>还没有参数 schema</strong><span>连接设备后，点击右侧“刷新参数”，等待 params/schema 与 params/current 到达。</span></div></div>
           </div>
         </section>
       </div>
 
       <div class="stack">
-        <section class="panel" aria-label="Dashboard commands">
+        <section class="panel" aria-label="控制命令">
           <header>
-            <h2 class="panel-title">Commands</h2>
-            <span id="command-topic" class="panel-meta">myrobot/control/cmd</span>
+            <div class="title-block">
+              <h2 class="panel-title">控制命令</h2>
+              <span class="panel-subtitle">向机器人控制 topic 发布常用指令。</span>
+            </div>
+            <span id="command-topic" class="topic-pill">myrobot/control/cmd</span>
           </header>
           <div class="command-body">
-            <div class="command-row">
-              <button class="danger command-button" type="button" data-command="stop_dashboard">
-                stop_dashboard
-              </button>
-              <button class="primary command-button" type="button" data-command="start_dashboard">
-                start_dashboard
-              </button>
-              <button class="secondary command-button" type="button" data-command="republish_params">
-                republish_params
-              </button>
+            <div class="command-grid">
+              <div class="command-card">
+                <div>
+                  <strong>启动 Dashboard</strong>
+                  <span>发布 start_dashboard，恢复数据与控制服务。</span>
+                </div>
+                <button class="primary command-button" type="button" data-command="start_dashboard">启动</button>
+              </div>
+              <div class="command-card">
+                <div>
+                  <strong>停止 Dashboard</strong>
+                  <span>发布 stop_dashboard。该操作会先弹窗确认，避免误触。</span>
+                </div>
+                <button class="danger command-button" type="button" data-command="stop_dashboard">停止</button>
+              </div>
+              <div class="command-card">
+                <div>
+                  <strong>重新发布参数</strong>
+                  <span>让下位/服务端重新广播 schema 与当前值。</span>
+                </div>
+                <button class="secondary command-button" type="button" data-command="republish_params">刷新参数</button>
+              </div>
             </div>
           </div>
         </section>
 
-        <section class="panel" aria-label="Control acknowledgements">
+        <section class="panel" aria-label="控制确认">
           <header>
-            <h2 class="panel-title">Ack</h2>
-            <span id="ack-topic" class="panel-meta">myrobot/control/ack</span>
+            <div class="title-block">
+              <h2 class="panel-title">控制回执</h2>
+              <span class="panel-subtitle">显示最近的参数或命令执行结果。</span>
+            </div>
+            <span id="ack-topic" class="topic-pill">myrobot/control/ack</span>
           </header>
           <div id="ack-list" class="ack-list">
-            <div class="empty-state">No ack</div>
+            <div class="empty-state"><div><strong>暂无控制回执</strong><span>发送命令或应用参数后，这里会显示成功/失败结果。</span></div></div>
           </div>
         </section>
 
-        <section class="panel" aria-label="Runtime logs">
+        <section class="panel" aria-label="运行日志">
           <header>
-            <h2 class="panel-title">Log</h2>
-            <div class="panel-actions">
-              <button id="toggle-log-scroll" class="secondary" type="button">Pause</button>
-              <button id="clear-log" class="secondary" type="button">Clear</button>
+            <div class="title-block">
+              <h2 class="panel-title">运行日志</h2>
+              <span class="panel-subtitle">系统消息和机器人日志都会显示在这里。</span>
+            </div>
+            <div class="log-toolbar">
+              <select id="log-level-filter" aria-label="日志级别筛选">
+                <option value="all">全部日志</option>
+                <option value="debug">Debug</option>
+                <option value="info">Info</option>
+                <option value="warn">Warn+</option>
+                <option value="error">Error+</option>
+              </select>
+              <button id="toggle-log-scroll" class="secondary" type="button">暂停滚动</button>
+              <button id="copy-log" class="secondary" type="button">复制日志</button>
+              <button id="clear-log" class="secondary" type="button">清空日志</button>
             </div>
           </header>
           <div id="log-list" class="log-body">
-            <div class="empty-state">No logs</div>
+            <div class="empty-state"><div><strong>暂无运行日志</strong><span>连接、订阅、发布、解析异常和机器人日志都会显示在这里。</span></div></div>
           </div>
         </section>
       </div>
     </main>
   </div>
+
+  <div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
 
   <script>
     (() => {
@@ -630,6 +1179,7 @@
       const MAX_LOGS = 500;
       const MAX_ACKS = 20;
       const RECONNECT_MS = 2000;
+      const STORAGE_KEY = "spvision-dashboard-settings";
 
       const brokerUrlInput = document.getElementById("broker-url");
       const robotIdInput = document.getElementById("robot-id");
@@ -646,10 +1196,19 @@
       const telemetrySourceLabel = document.getElementById("telemetry-source");
       const paramsMeta = document.getElementById("params-meta");
       const paramsList = document.getElementById("params-list");
+      const paramFilterInput = document.getElementById("param-filter");
+      const resetParamFilterButton = document.getElementById("reset-param-filter");
+      const dirtyParamCountLabel = document.getElementById("dirty-param-count");
+      const applyDirtyParamsButton = document.getElementById("apply-dirty-params");
+      const resetDirtyParamsButton = document.getElementById("reset-dirty-params");
       const ackList = document.getElementById("ack-list");
       const logList = document.getElementById("log-list");
       const toggleLogScrollButton = document.getElementById("toggle-log-scroll");
       const clearLogButton = document.getElementById("clear-log");
+      const copyLogButton = document.getElementById("copy-log");
+      const logLevelFilter = document.getElementById("log-level-filter");
+      const clearChartButton = document.getElementById("clear-chart");
+      const toastWrap = document.getElementById("toast-wrap");
       const commandButtons = Array.from(document.querySelectorAll(".command-button"));
       const chart = echarts.init(document.getElementById("chart"));
 
@@ -662,18 +1221,25 @@
       const paramEntries = new Map();
       const paramControls = new Map();
       const currentParamValues = new Map();
+      const dirtyParams = new Set();
+      const draftParamValues = new Map();
+      const pendingParamRequests = new Map();
       const logEntries = [];
       const ackEntries = [];
 
-      brokerUrlInput.value = defaultBrokerUrl();
-      robotIdInput.value = DEFAULT_ROBOT_ID;
+      hydrateSavedSettings();
+      activeRobotId = sanitizeRobotId(robotIdInput.value);
+      topics = buildTopics(activeRobotId);
       updateTopicLabels();
+      updateChartMetrics();
 
       chart.setOption({
         animation: false,
         color: ["#2563eb", "#16a34a", "#f97316", "#7c3aed", "#0891b2", "#dc2626", "#4b5563"],
         tooltip: {
-          trigger: "axis"
+          trigger: "axis",
+          axisPointer: { type: "cross" },
+          valueFormatter: (value) => Number.isFinite(Number(value)) ? Number(value).toFixed(4) : value
         },
         legend: {
           type: "scroll",
@@ -681,19 +1247,28 @@
           data: []
         },
         grid: {
-          top: 46,
-          right: 18,
-          bottom: 44,
-          left: 54
+          top: 52,
+          right: 24,
+          bottom: 48,
+          left: 60
         },
         xAxis: {
           type: "time",
-          boundaryGap: false
+          boundaryGap: false,
+          axisLabel: { color: "#667085" },
+          axisLine: { lineStyle: { color: "#d0d7e2" } },
+          splitLine: { show: false }
         },
         yAxis: {
           type: "value",
-          scale: true
+          scale: true,
+          axisLabel: { color: "#667085" },
+          splitLine: { lineStyle: { color: "#eef2f7" } }
         },
+        dataZoom: [
+          { type: "inside", xAxisIndex: 0, filterMode: "none" },
+          { type: "slider", xAxisIndex: 0, height: 20, bottom: 10, filterMode: "none" }
+        ],
         series: []
       });
 
@@ -701,19 +1276,45 @@
       connectButton.addEventListener("click", connect);
       disconnectButton.addEventListener("click", disconnect);
       robotIdInput.addEventListener("input", previewTopics);
+      brokerUrlInput.addEventListener("change", saveSettings);
+      robotIdInput.addEventListener("change", saveSettings);
+      paramFilterInput.addEventListener("input", renderParams);
+      resetParamFilterButton.addEventListener("click", () => {
+        paramFilterInput.value = "";
+        renderParams();
+      });
+      clearChartButton.addEventListener("click", clearChart);
+      applyDirtyParamsButton.addEventListener("click", applyDirtyParams);
+      resetDirtyParamsButton.addEventListener("click", resetDirtyParams);
+      logLevelFilter.addEventListener("change", renderLogs);
+      copyLogButton.addEventListener("click", copyVisibleLogs);
+      brokerUrlInput.addEventListener("keydown", submitConnectionOnEnter);
+      robotIdInput.addEventListener("keydown", submitConnectionOnEnter);
       commandButtons.forEach((button) => {
         button.addEventListener("click", () => publishCommand(button.dataset.command));
       });
       toggleLogScrollButton.addEventListener("click", () => {
         logScrollPaused = !logScrollPaused;
-        toggleLogScrollButton.textContent = logScrollPaused ? "Resume" : "Pause";
+        toggleLogScrollButton.textContent = logScrollPaused ? "恢复滚动" : "暂停滚动";
         if (!logScrollPaused) {
           scrollLogsToBottom();
         }
       });
       clearLogButton.addEventListener("click", () => {
+        if (logEntries.length && !window.confirm("确认清空当前日志显示吗？这不会影响机器人端日志。")) {
+          return;
+        }
         logEntries.length = 0;
         renderLogs();
+        showToast("日志已清空");
+      });
+
+      window.addEventListener("beforeunload", (event) => {
+        if (!dirtyParams.size) {
+          return;
+        }
+        event.preventDefault();
+        event.returnValue = "还有未应用的参数修改。";
       });
 
       function defaultBrokerUrl() {
@@ -721,9 +1322,35 @@
         return `ws://${host}:${MQTT_PORT}`;
       }
 
+      function submitConnectionOnEnter(event) {
+        if (event.key === "Enter" && !client) {
+          event.preventDefault();
+          connect();
+        }
+      }
+
+      function hydrateSavedSettings() {
+        let saved = null;
+        try {
+          saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+        } catch (_) {
+          saved = null;
+        }
+        brokerUrlInput.value = saved?.brokerUrl || defaultBrokerUrl();
+        robotIdInput.value = saved?.robotId || DEFAULT_ROBOT_ID;
+      }
+
+      function saveSettings() {
+        const payload = {
+          brokerUrl: brokerUrlInput.value.trim() || defaultBrokerUrl(),
+          robotId: sanitizeRobotId(robotIdInput.value)
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      }
+
       function sanitizeRobotId(value) {
-        const robotId = value.trim() || DEFAULT_ROBOT_ID;
-        return robotId.replace(/[\/+#]/g, "_");
+        const robotId = String(value || "").trim() || DEFAULT_ROBOT_ID;
+        return robotId.replace(/[\/+#+\s]/g, "_");
       }
 
       function buildTopics(robotId) {
@@ -756,19 +1383,40 @@
       function setStatus(isConnected, label) {
         statusDot.classList.toggle("online", isConnected);
         statusLabel.textContent = label;
+        const status = statusDot.parentElement;
+        status.classList.remove("online", "connecting", "reconnecting", "error", "offline");
+        if (isConnected) {
+          status.classList.add("online");
+        } else if (label.includes("连接中")) {
+          status.classList.add("connecting");
+        } else if (label.includes("重连")) {
+          status.classList.add("reconnecting");
+        } else if (label.includes("错误")) {
+          status.classList.add("error");
+        } else {
+          status.classList.add("offline");
+        }
+        setControls();
       }
 
-      function setControls(isActive) {
-        connectButton.disabled = isActive;
-        disconnectButton.disabled = !isActive;
-        brokerUrlInput.disabled = isActive;
-        robotIdInput.disabled = isActive;
+      function isMqttReady() {
+        return Boolean(client && client.connected);
+      }
+
+      function setControls() {
+        const hasClient = Boolean(client);
+        const ready = isMqttReady();
+        connectButton.disabled = hasClient;
+        disconnectButton.disabled = !hasClient;
+        brokerUrlInput.disabled = hasClient;
+        robotIdInput.disabled = hasClient;
         commandButtons.forEach((button) => {
-          button.disabled = !isActive;
+          button.disabled = !ready;
         });
-        paramControls.forEach(({ apply }) => {
-          apply.disabled = !isActive;
+        paramControls.forEach(({ entry, apply }) => {
+          apply.disabled = !ready || !isParamEditable(entry);
         });
+        updateDirtySummary();
       }
 
       function connect() {
@@ -783,8 +1431,9 @@
         brokerUrlInput.value = url;
         topics = buildTopics(activeRobotId);
         updateTopicLabels();
+        saveSettings();
         setControls(true);
-        setStatus(false, "Connecting");
+        setStatus(false, "连接中");
         appendSystemLog("info", `connecting ${url}`);
 
         try {
@@ -794,32 +1443,37 @@
             connectTimeout: 4000,
             reconnectPeriod: RECONNECT_MS
           });
+          setControls();
         } catch (error) {
           client = null;
           setControls(false);
-          setStatus(false, "Disconnected");
+          setStatus(false, "未连接");
           appendSystemLog("error", error.message);
+          showToast(error.message, "error");
           return;
         }
 
         client.on("connect", subscribeTopics);
-        client.on("reconnect", () => setStatus(false, "Reconnecting"));
-        client.on("offline", () => setStatus(false, "Offline"));
+        client.on("reconnect", () => setStatus(false, "重连中"));
+        client.on("offline", () => setStatus(false, "离线"));
         client.on("close", () => {
           if (client) {
-            setStatus(false, "Disconnected");
+            setStatus(false, "已断开");
           }
         });
         client.on("error", (error) => {
-          setStatus(false, "Error");
+          setStatus(false, "错误");
           appendSystemLog("error", error.message);
+          showToast(error.message, "error");
         });
         client.on("message", handleMessage);
       }
 
       function subscribeTopics() {
-        setStatus(true, "Connected");
+        setStatus(true, "已连接");
+        setControls();
         appendSystemLog("info", `connected ${activeRobotId}`);
+        showToast(`已连接：${activeRobotId}`);
 
         const subscriptions = {};
         subscriptions[topics.data] = { qos: 0 };
@@ -831,6 +1485,7 @@
         client.subscribe(subscriptions, (error) => {
           if (error) {
             appendSystemLog("error", `subscribe failed: ${error.message}`);
+            showToast(`订阅失败：${error.message}`, "error");
             return;
           }
           appendSystemLog("info", "subscriptions ready");
@@ -846,8 +1501,9 @@
         client = null;
         oldClient.end(true);
         setControls(false);
-        setStatus(false, "Disconnected");
+        setStatus(false, "未连接");
         appendSystemLog("info", "disconnected");
+        showToast("已断开连接");
       }
 
       function handleMessage(topic, payload) {
@@ -929,11 +1585,27 @@
             data: fieldSeries.get(key),
             emphasis: {
               focus: "series"
+            },
+            lineStyle: {
+              width: 2
             }
           }))
         });
+        updateChartMetrics();
+      }
+
+      function updateChartMetrics() {
         sampleCountLabel.textContent = String(totalSamples);
-        seriesCountLabel.textContent = String(keys.length);
+        seriesCountLabel.textContent = String(fieldSeries.size);
+      }
+
+      function clearChart() {
+        fieldSeries.clear();
+        totalSamples = 0;
+        lastDataTimeLabel.textContent = "-";
+        chart.setOption({ legend: { data: [] }, series: [] }, true);
+        updateChartMetrics();
+        showToast("曲线已清空");
       }
 
       function handleLog(message) {
@@ -964,13 +1636,16 @@
       }
 
       function renderLogs() {
-        if (!logEntries.length) {
-          logList.innerHTML = '<div class="empty-state">No logs</div>';
+        const visible = getVisibleLogs();
+        if (!visible.length) {
+          logList.innerHTML = logEntries.length
+            ? '<div class="empty-state"><div><strong>当前筛选下没有日志</strong><span>可以切换日志级别筛选，或等待新的日志到达。</span></div></div>'
+            : '<div class="empty-state"><div><strong>暂无运行日志</strong><span>连接、订阅、发布、解析异常和机器人日志都会显示在这里。</span></div></div>';
           return;
         }
 
         logList.innerHTML = "";
-        for (const entry of logEntries) {
+        for (const entry of visible) {
           const row = document.createElement("div");
           const level = normalizeLogLevel(entry.level);
           row.className = `log-entry ${level}`;
@@ -984,6 +1659,38 @@
 
         if (!logScrollPaused) {
           scrollLogsToBottom();
+        }
+      }
+
+      function getVisibleLogs() {
+        const filter = logLevelFilter.value;
+        if (filter === "all") {
+          return logEntries;
+        }
+        const priority = { debug: 0, info: 1, warn: 2, error: 3, critical: 3 };
+        const minPriority = priority[filter] ?? 0;
+        return logEntries.filter((entry) => (priority[normalizeLogLevel(entry.level)] ?? 1) >= minPriority);
+      }
+
+      async function copyVisibleLogs() {
+        const text = getVisibleLogs()
+          .map((entry) => `[${formatDateTime(entry.timestamp)}] ${normalizeLogLevel(entry.level).toUpperCase()} ${entry.message}`)
+          .join("\n");
+        if (!text) {
+          showToast("当前没有可复制的日志", "warn");
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast("日志已复制");
+        } catch (_) {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand("copy");
+          textarea.remove();
+          showToast("日志已复制");
         }
       }
 
@@ -1014,7 +1721,7 @@
           }
           paramEntries.set(param.key, entry);
         }
-        paramsMeta.textContent = `${paramEntries.size} params`;
+        updateParamsMeta();
         renderParams();
       }
 
@@ -1032,7 +1739,16 @@
           }
           syncParamControl(key, value);
         }
-        paramsMeta.textContent = `${Object.keys(message.values).length} current values`;
+        updateParamsMeta();
+      }
+
+      function updateParamsMeta(visibleCount = null) {
+        const total = paramEntries.size;
+        if (visibleCount !== null && visibleCount !== total) {
+          paramsMeta.textContent = `${visibleCount}/${total} 个参数`;
+        } else {
+          paramsMeta.textContent = total ? `${total} 个参数` : "等待 schema";
+        }
       }
 
       function renderParams() {
@@ -1040,18 +1756,33 @@
         paramsList.innerHTML = "";
 
         if (!paramEntries.size) {
-          paramsList.innerHTML = '<div class="empty-state">No schema received</div>';
+          paramsList.innerHTML = '<div class="empty-state"><div><strong>还没有参数 schema</strong><span>连接设备后，点击右侧“刷新参数”，等待 params/schema 与 params/current 到达。</span></div></div>';
+          updateParamsMeta();
           setControls(Boolean(client));
           return;
         }
 
+        const keyword = paramFilterInput.value.trim().toLowerCase();
         const groups = new Map();
+        let visibleCount = 0;
         for (const entry of paramEntries.values()) {
           const group = String(entry.group || "default");
+          const searchable = `${entry.key} ${entry.type} ${group} ${entry.unit || ""}`.toLowerCase();
+          if (keyword && !searchable.includes(keyword)) {
+            continue;
+          }
           if (!groups.has(group)) {
             groups.set(group, []);
           }
           groups.get(group).push(entry);
+          visibleCount += 1;
+        }
+
+        if (!visibleCount) {
+          paramsList.innerHTML = '<div class="empty-state"><div><strong>没有匹配的参数</strong><span>换一个关键词，或点击“重置搜索”查看全部参数。</span></div></div>';
+          updateParamsMeta(0);
+          setControls(Boolean(client));
+          return;
         }
 
         for (const [group, entries] of groups) {
@@ -1059,7 +1790,7 @@
           groupNode.className = "param-group";
           const title = document.createElement("div");
           title.className = "param-group-title";
-          title.textContent = group;
+          title.innerHTML = `<span>${escapeHtml(group)}</span><span>${entries.length}</span>`;
           groupNode.appendChild(title);
 
           for (const entry of entries) {
@@ -1067,12 +1798,15 @@
           }
           paramsList.appendChild(groupNode);
         }
+        updateParamsMeta(visibleCount);
         setControls(Boolean(client));
       }
 
       function createParamRow(entry) {
+        const editable = isParamEditable(entry);
         const row = document.createElement("div");
         row.className = "param-row";
+        row.dataset.key = entry.key;
 
         const status = document.createElement("div");
         status.className = "param-status";
@@ -1082,36 +1816,173 @@
         const currentValue = document.createElement("div");
         currentValue.className = "current-value";
         currentValue.textContent = formatParamValue(entry.value, entry.unit);
-        status.append(name, currentValue);
+        const detail = document.createElement("div");
+        detail.className = "param-detail";
+        detail.textContent = getParamDetail(entry);
+        const paramState = document.createElement("div");
+        paramState.className = "param-state synced";
+        paramState.textContent = "已同步";
+        status.append(name, currentValue, detail, paramState);
 
         const inputs = document.createElement("div");
         inputs.className = "param-inputs";
         const apply = document.createElement("button");
         apply.className = "primary";
         apply.type = "button";
-        apply.textContent = "Apply";
+        apply.textContent = editable ? "应用" : "只读";
+        apply.disabled = !editable;
 
-        const controls = buildParamInputs(entry);
+        const inputEntry = dirtyParams.has(entry.key)
+          ? { ...entry, value: draftParamValues.get(entry.key) }
+          : entry;
+        const controls = buildParamInputs(inputEntry);
         inputs.classList.toggle("single", controls.length === 1);
         controls.forEach((control) => inputs.appendChild(control));
         apply.addEventListener("click", () => publishParam(entry.key));
 
+        if (editable) {
+          for (const control of controls) {
+            const input = control.matches?.("input, select, textarea")
+              ? control
+              : control.querySelector?.("input, select, textarea");
+            if (input) {
+              input.addEventListener("input", () => markParamDirty(entry.key, true));
+              input.addEventListener("change", () => markParamDirty(entry.key, true));
+              input.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  publishParam(entry.key);
+                }
+              });
+            }
+          }
+        } else {
+          for (const control of controls) {
+            const input = control.matches?.("input, select, textarea")
+              ? control
+              : control.querySelector?.("input, select, textarea");
+            if (input) {
+              input.disabled = true;
+              input.readOnly = true;
+            }
+          }
+        }
+
         row.append(status, inputs, apply);
-        paramControls.set(entry.key, { entry, controls, currentValue, apply });
+        paramControls.set(entry.key, { entry, row, controls, currentValue, paramState, apply });
+        if (!editable) {
+          setParamState(entry.key, "readonly", entry.restart_required ? "重启生效" : "只读");
+        } else if (dirtyParams.has(entry.key)) {
+          setParamState(entry.key, "dirty", "待应用");
+        } else if ([...pendingParamRequests.values()].includes(entry.key)) {
+          setParamState(entry.key, "pending", "等待回执");
+        }
         return row;
       }
 
+      function getParamDetail(entry) {
+        const parts = [`类型：${entry.type}`];
+        parts.push(isParamEditable(entry) ? "热更新" : "只读");
+        if (entry.restart_required) {
+          parts.push("重启后生效");
+        }
+        if (entry.render === "json") {
+          parts.push("JSON");
+        }
+        if (entry.source_key) {
+          parts.push(`源：${entry.source_key}`);
+        }
+        if (entry.unit) {
+          parts.push(`单位：${entry.unit}`);
+        }
+        if (Number.isFinite(Number(entry.min)) || Number.isFinite(Number(entry.max))) {
+          const min = Number.isFinite(Number(entry.min)) ? entry.min : "-∞";
+          const max = Number.isFinite(Number(entry.max)) ? entry.max : "+∞";
+          parts.push(`范围：${min} ~ ${max}`);
+        }
+        if (Number.isFinite(Number(entry.step))) {
+          parts.push(`步长：${entry.step}`);
+        }
+        return parts.join(" · ");
+      }
+
+      function isParamEditable(entry) {
+        return entry && entry.editable !== false && entry.read_only !== true;
+      }
+
+      function markParamDirty(key, dirty) {
+        const control = paramControls.get(key);
+        if (!control || !isParamEditable(control.entry)) {
+          return;
+        }
+        const value = readParamValue(control);
+        const hasChanged = dirty && !valuesEqual(value, control.entry.value);
+        if (hasChanged) {
+          dirtyParams.add(key);
+          draftParamValues.set(key, value);
+          setParamState(key, "dirty", "待应用");
+        } else {
+          dirtyParams.delete(key);
+          draftParamValues.delete(key);
+          setParamState(key, "synced", "已同步");
+        }
+        updateDirtySummary();
+        setControls();
+      }
+
+      function setParamState(key, state, text) {
+        const control = paramControls.get(key);
+        if (!control) {
+          return;
+        }
+        control.row.classList.remove("dirty", "pending", "success", "fail");
+        control.paramState.classList.remove("dirty", "pending", "success", "fail", "synced", "readonly");
+        if (state !== "synced" && state !== "readonly") {
+          control.row.classList.add(state === "dirty" ? "dirty" : state);
+        }
+        control.paramState.classList.add(state);
+        control.paramState.textContent = text;
+      }
+
+      function updateDirtySummary() {
+        dirtyParamCountLabel.innerHTML = `待应用：<strong>${dirtyParams.size}</strong>`;
+        applyDirtyParamsButton.disabled = !isMqttReady() || dirtyParams.size === 0;
+        resetDirtyParamsButton.disabled = dirtyParams.size === 0;
+      }
+
+      function valuesEqual(a, b) {
+        const na = Number(a);
+        const nb = Number(b);
+        if (Number.isFinite(na) && Number.isFinite(nb)) {
+          return na === nb;
+        }
+        return formatRawValue(a) === formatRawValue(b);
+      }
+
       function buildParamInputs(entry) {
+        const editable = isParamEditable(entry);
+        if (entry.render === "json") {
+          const textarea = document.createElement("textarea");
+          textarea.className = "param-json";
+          textarea.value = formatRawValue(entry.value);
+          textarea.disabled = !editable;
+          textarea.readOnly = !editable;
+          return [textarea];
+        }
+
         if (entry.type === "number") {
           const range = document.createElement("input");
           range.type = "range";
           applyNumberBounds(range, entry);
           range.value = numberOrDefault(entry.value, range.min || 0);
+          range.disabled = !editable;
 
           const number = document.createElement("input");
           number.type = "number";
           applyNumberBounds(number, entry);
           number.value = range.value;
+          number.disabled = !editable;
+          number.readOnly = !editable;
 
           range.addEventListener("input", () => {
             number.value = range.value;
@@ -1125,18 +1996,31 @@
         }
 
         if (entry.type === "bool") {
-          const wrap = document.createElement("div");
+          const wrap = document.createElement("label");
           wrap.className = "bool-input";
           const checkbox = document.createElement("input");
           checkbox.type = "checkbox";
           checkbox.checked = Boolean(entry.value);
-          wrap.appendChild(checkbox);
+          checkbox.disabled = !editable;
+          const label = document.createElement("span");
+          label.textContent = checkbox.checked ? "开启" : "关闭";
+          checkbox.addEventListener("change", () => {
+            label.textContent = checkbox.checked ? "开启" : "关闭";
+          });
+          wrap.append(checkbox, label);
           return [wrap];
         }
 
         if (entry.type === "enum") {
           const select = document.createElement("select");
+          select.disabled = !editable;
           const options = Array.isArray(entry.options) ? entry.options : [];
+          if (!options.length) {
+            const empty = document.createElement("option");
+            empty.value = "";
+            empty.textContent = "无可选项";
+            select.appendChild(empty);
+          }
           for (const option of options) {
             const node = document.createElement("option");
             node.value = String(option);
@@ -1149,7 +2033,9 @@
 
         const input = document.createElement("input");
         input.type = "text";
-        input.value = String(entry.value ?? "");
+        input.value = formatRawValue(entry.value);
+        input.disabled = !editable;
+        input.readOnly = !editable;
         return [input];
       }
 
@@ -1174,16 +2060,30 @@
         }
         control.entry.value = value;
         control.currentValue.textContent = formatParamValue(value, control.entry.unit);
+        if (!dirtyParams.has(key)) {
+          writeParamControlValue(control, value);
+          if (isParamEditable(control.entry)) {
+            setParamState(key, "synced", "已同步");
+          } else {
+            setParamState(key, "readonly", control.entry.restart_required ? "重启生效" : "只读");
+          }
+        }
+      }
 
+      function writeParamControlValue(control, value) {
         if (control.entry.type === "number") {
           for (const item of control.controls) {
             item.value = String(value);
           }
         } else if (control.entry.type === "bool") {
           const checkbox = control.controls[0].querySelector("input");
+          const label = control.controls[0].querySelector("span");
           checkbox.checked = Boolean(value);
+          if (label) {
+            label.textContent = checkbox.checked ? "开启" : "关闭";
+          }
         } else {
-          control.controls[0].value = String(value ?? "");
+          control.controls[0].value = formatRawValue(value);
         }
       }
 
@@ -1192,17 +2092,65 @@
         if (!control) {
           return;
         }
+        if (!isParamEditable(control.entry)) {
+          appendSystemLog("warn", `${key}: read-only parameter`);
+          showToast(`${key} 当前为只读参数`, "warn");
+          return;
+        }
         const value = readParamValue(control);
         if (control.entry.type === "number" && !Number.isFinite(value)) {
           appendSystemLog("warn", `${key}: invalid number`);
+          showToast(`${key} 不是有效数字`, "warn");
           return;
         }
+        const requestId = makeRequestId("param");
         publishJson(topics.controlParam, {
-          request_id: makeRequestId("param"),
+          request_id: requestId,
           key,
           value,
           timestamp: Date.now()
-        }, 1);
+        }, 1, () => {
+          pendingParamRequests.set(requestId, key);
+          dirtyParams.delete(key);
+          draftParamValues.delete(key);
+          setParamState(key, "pending", "等待回执");
+          updateDirtySummary();
+        }, () => {
+          setParamState(key, "fail", "发布失败");
+        });
+      }
+
+      function applyDirtyParams() {
+        if (!dirtyParams.size) {
+          showToast("没有待应用的参数", "warn");
+          return;
+        }
+        for (const key of Array.from(dirtyParams)) {
+          const control = paramControls.get(key);
+          if (control) {
+            publishParam(key);
+          }
+        }
+      }
+
+      function resetDirtyParams() {
+        if (!dirtyParams.size) {
+          return;
+        }
+        for (const key of Array.from(dirtyParams)) {
+          const control = paramControls.get(key);
+          if (!control) {
+            dirtyParams.delete(key);
+            draftParamValues.delete(key);
+            continue;
+          }
+          writeParamControlValue(control, control.entry.value);
+          dirtyParams.delete(key);
+          draftParamValues.delete(key);
+          setParamState(key, "synced", "已同步");
+        }
+        updateDirtySummary();
+        showToast("已撤销未应用修改");
       }
 
       function readParamValue(control) {
@@ -1216,6 +2164,12 @@
       }
 
       function publishCommand(command) {
+        if (command === "stop_dashboard") {
+          const ok = window.confirm("确认发送 stop_dashboard 吗？该操作可能会停止数据发布。 ");
+          if (!ok) {
+            return;
+          }
+        }
         publishJson(topics.controlCmd, {
           request_id: makeRequestId("cmd"),
           command,
@@ -1223,37 +2177,61 @@
         }, 1);
       }
 
-      function publishJson(topic, payload, qos) {
+      function publishJson(topic, payload, qos, onSuccess, onError) {
         if (!client || !client.connected) {
           appendSystemLog("warn", `not connected: ${topic}`);
+          showToast("当前未连接 MQTT Broker", "warn");
+          onError?.(new Error("not connected"));
           return;
         }
         client.publish(topic, JSON.stringify(payload), { qos }, (error) => {
           if (error) {
             appendSystemLog("error", `publish ${topic}: ${error.message}`);
+            showToast(`发布失败：${error.message}`, "error");
+            onError?.(error);
             return;
           }
           appendSystemLog("debug", `published ${topic} ${payload.request_id}`);
+          showToast(`已发布：${payload.command || payload.key}`);
+          onSuccess?.();
         });
       }
 
       function handleAck(message) {
         const timestamp = toTimestampMs(message.timestamp);
+        const requestId = String(message.request_id || "-");
+        const ok = Boolean(message.ok);
+        const ackMessage = String(message.message || message.reason || "-");
         ackEntries.unshift({
-          requestId: String(message.request_id || "-"),
-          ok: Boolean(message.ok),
-          message: String(message.message || message.reason || "-"),
+          requestId,
+          ok,
+          message: ackMessage,
           timestamp
         });
         while (ackEntries.length > MAX_ACKS) {
           ackEntries.pop();
+        }
+        if (pendingParamRequests.has(requestId)) {
+          const key = pendingParamRequests.get(requestId);
+          pendingParamRequests.delete(requestId);
+          setParamState(key, ok ? "success" : "fail", ok ? "已确认" : "执行失败");
+          if (ok) {
+            window.setTimeout(() => {
+              if (!dirtyParams.has(key) && ![...pendingParamRequests.values()].includes(key)) {
+                setParamState(key, "synced", "已同步");
+              }
+            }, 1800);
+          }
+        }
+        if (!ok) {
+          showToast(`回执失败：${ackMessage}`, "error");
         }
         renderAcks();
       }
 
       function renderAcks() {
         if (!ackEntries.length) {
-          ackList.innerHTML = '<div class="empty-state">No ack</div>';
+          ackList.innerHTML = '<div class="empty-state"><div><strong>暂无控制回执</strong><span>发送命令或应用参数后，这里会显示成功/失败结果。</span></div></div>';
           return;
         }
         ackList.innerHTML = "";
@@ -1261,7 +2239,10 @@
           const node = document.createElement("div");
           node.className = `ack-item ${ack.ok ? "" : "fail"}`;
           node.innerHTML = `
-            <div class="ack-id">${escapeHtml(ack.requestId)} · ${ack.ok ? "ok" : "failed"}</div>
+            <div class="ack-topline">
+              <div class="ack-id">${escapeHtml(ack.requestId)}</div>
+              <span class="badge ${ack.ok ? "good" : "fail"}">${ack.ok ? "成功" : "失败"}</span>
+            </div>
             <div class="ack-message">${escapeHtml(ack.message)}</div>
             <div class="ack-time">${escapeHtml(formatDateTime(ack.timestamp))}</div>
           `;
@@ -1281,10 +2262,24 @@
 
       function formatParamValue(value, unit) {
         const suffix = unit ? ` ${unit}` : "";
-        if (value === undefined || value === null) {
-          return `current: -${suffix}`;
+        if (value === undefined || value === null || value === "") {
+          return `当前值：-${suffix}`;
         }
-        return `current: ${String(value)}${suffix}`;
+        return `当前值：${formatRawValue(value)}${suffix}`;
+      }
+
+      function formatRawValue(value) {
+        if (value === undefined || value === null) {
+          return "";
+        }
+        if (typeof value === "object") {
+          try {
+            return JSON.stringify(value);
+          } catch (error) {
+            return String(value);
+          }
+        }
+        return String(value);
       }
 
       function isPlainObject(value) {
@@ -1314,6 +2309,18 @@
           .replaceAll(">", "&gt;")
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#39;");
+      }
+
+      function showToast(message, type = "info") {
+        const toast = document.createElement("div");
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        toastWrap.appendChild(toast);
+        window.setTimeout(() => {
+          toast.style.opacity = "0";
+          toast.style.transform = "translateY(8px)";
+          window.setTimeout(() => toast.remove(), 220);
+        }, 2600);
       }
 
       setControls(false);
