@@ -38,8 +38,10 @@ int main() {
                      timestamp);
     bridge.push_log("info", "mqtt_bridge_smoke", "bridge smoke message",
                     timestamp);
-    bridge.publish_params_schema({tools::dashboard::make_number_param_schema(
-        "camera.exposure", 5000.0, 0.0, 20000.0, 100.0, "us", "camera")});
+    bridge.publish_params_schema_payload(tools::dashboard::make_params_schema_payload(
+        {tools::dashboard::make_number_param_schema(
+            "camera.exposure", 5000.0, 0.0, 20000.0, 100.0, "us",
+            "camera")}));
     bridge.publish_params_current(nlohmann::json{{"camera.exposure", 5000}},
                                   timestamp);
     bridge.publish_ack("smoke-request", true, "smoke ack",
