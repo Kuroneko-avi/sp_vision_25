@@ -1603,7 +1603,10 @@
         fieldSeries.clear();
         totalSamples = 0;
         lastDataTimeLabel.textContent = "-";
-        chart.setOption({ legend: { data: [] }, series: [] }, true);
+        chart.setOption(
+          { legend: { data: [] }, series: [] },
+          { replaceMerge: ["legend", "series"] }
+        );
         updateChartMetrics();
         showToast("曲线已清空");
       }
