@@ -42,6 +42,18 @@ scripts/dashboard_hardwareless_smoke.sh
 
 The script starts the dashboard broker/http container, creates a virtual `/dev/gimbal` inside the dev container, runs `auto_aim_debug_mpc` with `--mock-runtime --video-source assets/demo/demo.avi --video-loop`, and verifies `data`, `params/schema`, `params/current`, and `control/ack`.
 
+For manual browser inspection, use the long-running hardwareless runtime:
+
+```bash
+scripts/dashboard_hardwareless_run.sh
+```
+
+It starts the same broker/http stack and virtual `/dev/gimbal`, then keeps `auto_aim_debug_mpc` running with the demo video loop until Ctrl+C. Override inputs with environment variables:
+
+```bash
+ROBOT_ID=myrobot VIDEO_SOURCE=assets/demo/demo.avi scripts/dashboard_hardwareless_run.sh
+```
+
 The parameter panel is schema-driven. MPC entrypoints publish a catalog derived from `configs/standard3.yaml`: hot Planner/Buff Aimer fields are editable, while the remaining scalar, array, matrix, and calibration values are displayed as read-only restart-required configuration.
 
 Hardware entrypoints can be launched from the same container:
