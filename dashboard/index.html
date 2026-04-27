@@ -395,6 +395,41 @@
       min-height: 430px;
     }
 
+    .series-filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 18px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .series-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      max-width: 220px;
+      min-height: 32px;
+      padding: 5px 9px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+    }
+
+    .series-toggle input {
+      width: 16px;
+      min-height: 16px;
+    }
+
+    .series-toggle span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .metrics {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1046,6 +1081,7 @@
           <div class="chart-body">
             <div id="chart"></div>
           </div>
+          <div id="series-filter" class="series-filter" aria-label="曲线显示控制"></div>
           <div class="metrics">
             <div class="metric">
               <span>Samples</span>
@@ -1195,6 +1231,7 @@
       const seriesCountLabel = document.getElementById("series-count");
       const lastDataTimeLabel = document.getElementById("last-data-time");
       const telemetrySourceLabel = document.getElementById("telemetry-source");
+      const seriesFilter = document.getElementById("series-filter");
       const paramsMeta = document.getElementById("params-meta");
       const paramsList = document.getElementById("params-list");
       const paramFilterInput = document.getElementById("param-filter");
@@ -1220,6 +1257,7 @@
       let totalSamples = 0;
       let lastTelemetryTimestamp = null;
       const fieldSeries = new Map();
+      const hiddenTelemetrySeries = new Set();
       const paramEntries = new Map();
       const paramControls = new Map();
       const currentParamValues = new Map();
@@ -1272,6 +1310,17 @@
           { type: "slider", xAxisIndex: 0, height: 20, bottom: 10, filterMode: "none" }
         ],
         series: []
+      });
+
+      chart.on("legendselectchanged", (event) => {
+        for (const [key, selected] of Object.entries(event.selected || {})) {
+          if (selected) {
+            hiddenTelemetrySeries.delete(key);
+          } else {
+            hiddenTelemetrySeries.add(key);
+          }
+        }
+        renderSeriesFilter(Array.from(fieldSeries.keys()));
       });
 
       window.addEventListener("resize", () => chart.resize());
@@ -1575,6 +1624,10 @@
 
       function renderChart() {
         const keys = Array.from(fieldSeries.keys());
+        const legendSelected = {};
+        for (const key of keys) {
+          legendSelected[key] = !hiddenTelemetrySeries.has(key);
+        }
         const xAxis =
           lastTelemetryTimestamp === null
             ? {}
@@ -1585,7 +1638,8 @@
         chart.setOption({
           xAxis,
           legend: {
-            data: keys
+            data: keys,
+            selected: legendSelected
           },
           series: keys.map((key) => ({
             name: key,
@@ -1601,7 +1655,37 @@
             }
           }))
         });
+        renderSeriesFilter(keys);
         updateChartMetrics();
+      }
+
+      function renderSeriesFilter(keys) {
+        seriesFilter.innerHTML = "";
+        if (!keys.length) {
+          return;
+        }
+        for (const key of keys) {
+          const label = document.createElement("label");
+          label.className = "series-toggle";
+          label.title = key;
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = !hiddenTelemetrySeries.has(key);
+          checkbox.addEventListener("change", () => {
+            if (checkbox.checked) {
+              hiddenTelemetrySeries.delete(key);
+            } else {
+              hiddenTelemetrySeries.add(key);
+            }
+            renderChart();
+          });
+
+          const text = document.createElement("span");
+          text.textContent = key;
+          label.append(checkbox, text);
+          seriesFilter.appendChild(label);
+        }
       }
 
       function pruneSeriesPoints(points, minTimestamp) {
@@ -1620,9 +1704,11 @@
 
       function clearChart() {
         fieldSeries.clear();
+        hiddenTelemetrySeries.clear();
         totalSamples = 0;
         lastTelemetryTimestamp = null;
         lastDataTimeLabel.textContent = "-";
+        renderSeriesFilter([]);
         chart.setOption(
           { xAxis: { min: null, max: null }, legend: { data: [] }, series: [] },
           { replaceMerge: ["xAxis", "legend", "series"] }
