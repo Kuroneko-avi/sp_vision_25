@@ -1,0 +1,10 @@
+services:
+  dashboard-net:
+    build:
+      context: .
+      dockerfile: docker/dashboard/Dockerfile
+    container_name: sp_vision_dashboard_net
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+      - "8080:8080"

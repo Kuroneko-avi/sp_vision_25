@@ -6,15 +6,45 @@
 
 namespace auto_buff
 {
+namespace
+{
+constexpr double PI = 3.14159265358979323846;
+constexpr double DEG_TO_RAD = PI / 180.0;
+constexpr double RAD_TO_DEG = 180.0 / PI;
+}  // namespace
+
 Aimer::Aimer(const std::string & config_path)
 {
   auto yaml = YAML::LoadFile(config_path);
-  yaw_offset_ = yaml["yaw_offset"].as<double>() / 57.3;      // degree to rad
-  pitch_offset_ = yaml["pitch_offset"].as<double>() / 57.3;  // degree to rad
+  yaw_offset_ = yaml["yaw_offset"].as<double>() * DEG_TO_RAD;
+  pitch_offset_ = yaml["pitch_offset"].as<double>() * DEG_TO_RAD;
   fire_gap_time_ = yaml["fire_gap_time"].as<double>();
   predict_time_ = yaml["predict_time"].as<double>();
 
   last_fire_t_ = std::chrono::steady_clock::now();
+}
+
+Aimer::HotParams Aimer::get_hot_params() const
+{
+  std::lock_guard<std::mutex> lock(params_mutex_);
+  return {yaw_offset_ * RAD_TO_DEG, pitch_offset_ * RAD_TO_DEG, fire_gap_time_, predict_time_};
+}
+
+bool Aimer::apply_hot_param(const std::string & key, double value)
+{
+  std::lock_guard<std::mutex> lock(params_mutex_);
+  if (key == "yaw_offset_deg") {
+    yaw_offset_ = value * DEG_TO_RAD;
+  } else if (key == "pitch_offset_deg") {
+    pitch_offset_ = value * DEG_TO_RAD;
+  } else if (key == "fire_gap_time") {
+    fire_gap_time_ = value;
+  } else if (key == "predict_time") {
+    predict_time_ = value;
+  } else {
+    return false;
+  }
+  return true;
 }
 
 io::Command Aimer::aim(
@@ -30,7 +60,15 @@ io::Command Aimer::aim(
   auto now = std::chrono::steady_clock::now();
 
   auto detect_now_gap = tools::delta_time(now, timestamp);
-  auto future = to_now ? (detect_now_gap + predict_time_) : 0.1 + predict_time_;
+  double fire_gap_time;
+  double predict_time;
+  {
+    std::lock_guard<std::mutex> lock(params_mutex_);
+    fire_gap_time = fire_gap_time_;
+    predict_time = predict_time_;
+  }
+
+  auto future = to_now ? (detect_now_gap + predict_time) : 0.1 + predict_time;
   double yaw = 0, pitch = 0;
 
   if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch)) {
@@ -58,7 +96,7 @@ io::Command Aimer::aim(
   if (switch_fanblade_) {
     command.shoot = false;
     last_fire_t_ = now;
-  } else if (!switch_fanblade_ && tools::delta_time(now, last_fire_t_) > fire_gap_time_) {
+  } else if (!switch_fanblade_ && tools::delta_time(now, last_fire_t_) > fire_gap_time) {
     command.shoot = true;
     last_fire_t_ = now;
   }
@@ -83,7 +121,15 @@ auto_aim::Plan Aimer::mpc_aim(
   auto now = std::chrono::steady_clock::now();
 
   auto detect_now_gap = tools::delta_time(now, timestamp);
-  auto future = to_now ? (detect_now_gap + predict_time_) : 0.1 + predict_time_;
+  double fire_gap_time;
+  double predict_time;
+  {
+    std::lock_guard<std::mutex> lock(params_mutex_);
+    fire_gap_time = fire_gap_time_;
+    predict_time = predict_time_;
+  }
+
+  auto future = to_now ? (detect_now_gap + predict_time) : 0.1 + predict_time;
   double yaw = 0, pitch = 0;
 
   if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch)) {
@@ -118,10 +164,9 @@ auto_aim::Plan Aimer::mpc_aim(
         plan.pitch_acc = 0;
         first_in_aimer_ = false;
       } else {
-        auto dt = predict_time_;
+        auto dt = predict_time;
         double last_yaw_mpc, last_pitch_mpc;
-        get_send_angle(
-          target, predict_time_ * -1, bullet_speed, to_now, last_yaw_mpc, last_pitch_mpc);
+        get_send_angle(target, predict_time * -1, bullet_speed, to_now, last_yaw_mpc, last_pitch_mpc);
         plan.yaw_vel = tools::limit_rad(yaw - last_yaw_mpc) / (2 * dt);
         // plan.yaw_vel = tools::limit_min_max(plan.yaw_vel, -6.28, 6.28);
         plan.yaw_acc = (tools::limit_rad(yaw - gs.yaw) - tools::limit_rad(gs.yaw - last_yaw_mpc)) /
@@ -139,7 +184,7 @@ auto_aim::Plan Aimer::mpc_aim(
   if (switch_fanblade_) {
     plan.fire = false;
     last_fire_t_ = now;
-  } else if (!switch_fanblade_ && tools::delta_time(now, last_fire_t_) > fire_gap_time_) {
+  } else if (!switch_fanblade_ && tools::delta_time(now, last_fire_t_) > fire_gap_time) {
     plan.fire = true;
     last_fire_t_ = now;
   }
@@ -193,8 +238,16 @@ bool Aimer::get_send_angle(
   }
 
   // 计算偏航角和俯仰角，并返回命中结果
-  yaw = std::atan2(aim_in_world[1], aim_in_world[0]) + yaw_offset_;
-  pitch = trajectory1.pitch + pitch_offset_;
+  double yaw_offset;
+  double pitch_offset;
+  {
+    std::lock_guard<std::mutex> lock(params_mutex_);
+    yaw_offset = yaw_offset_;
+    pitch_offset = pitch_offset_;
+  }
+
+  yaw = std::atan2(aim_in_world[1], aim_in_world[0]) + yaw_offset;
+  pitch = trajectory1.pitch + pitch_offset;
   return true;
 };
 
