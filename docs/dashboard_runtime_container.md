@@ -42,22 +42,31 @@ scripts/dashboard_net_down.sh
 Start the real vision program outside the Dashboard container:
 
 ```bash
-./build/standard_mpc \
-  --dashboard \
-  --robot-id myrobot \
-  --mqtt-host tcp://127.0.0.1:1883 \
-  configs/standard3.yaml
+./build/standard_mpc configs/standard3.yaml
 ```
 
 or:
 
 ```bash
-./build/auto_aim_debug_mpc \
-  --dashboard \
-  --robot-id myrobot \
-  --mqtt-host tcp://127.0.0.1:1883 \
-  configs/standard3.yaml
+./build/auto_aim_debug_mpc configs/standard3.yaml
 ```
+
+Dashboard startup is controlled by the YAML `dashboard` block:
+
+```yaml
+dashboard:
+  enabled: true
+  robot_id: "myrobot"
+  mqtt_host: "tcp://127.0.0.1:1883"
+```
+
+Command line options still override YAML:
+
+```bash
+./build/standard_mpc --robot-id hero --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
+```
+
+Passing `--dashboard` forces Dashboard on even if `dashboard.enabled` is `false`.
 
 If the vision app runs in another Docker container, prefer host networking:
 

@@ -38,6 +38,12 @@ target_link_libraries(dashboard_params
         tools
 )
 
+add_library(dashboard_config STATIC tools/dashboard_config.cpp)
+target_link_libraries(dashboard_config
+    PUBLIC
+        yaml-cpp
+)
+
 ####################src###################
 add_executable(standard src/standard.cpp)
 add_executable(mt_standard src/mt_standard.cpp)
@@ -51,8 +57,8 @@ add_executable(uav_debug src/uav_debug.cpp)
 
 target_link_libraries(standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(mt_standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
-target_link_libraries(standard_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
-target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
+target_link_libraries(standard_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io dashboard_config)
+target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io dashboard_config)
 if(TARGET mqtt_bridge)
     target_link_libraries(standard_mpc mqtt_bridge dashboard_params)
     target_link_libraries(auto_aim_debug_mpc mqtt_bridge dashboard_params)

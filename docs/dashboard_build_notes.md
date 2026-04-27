@@ -36,17 +36,28 @@ sudo apt install -y mosquitto-clients
 
 ## Runtime Boundary
 
-`dashboard-net` publishes no application telemetry and starts no vision program. Start `standard_mpc` or `auto_aim_debug_mpc` manually with real hardware access:
+`dashboard-net` publishes no application telemetry and starts no vision program. Start `standard_mpc` or `auto_aim_debug_mpc` manually with real hardware access. Dashboard settings are read from `configs/standard3.yaml`:
+
+```yaml
+dashboard:
+  enabled: true
+  robot_id: "myrobot"
+  mqtt_host: "tcp://127.0.0.1:1883"
+```
+
+Recommended startup:
 
 ```bash
-./build/standard_mpc --dashboard --robot-id myrobot --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
+./build/standard_mpc configs/standard3.yaml
 ```
 
 or:
 
 ```bash
-./build/auto_aim_debug_mpc --dashboard --robot-id myrobot --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
+./build/auto_aim_debug_mpc configs/standard3.yaml
 ```
+
+CLI options override YAML. `--dashboard` forces enable, `--robot-id` overrides `dashboard.robot_id`, and `--mqtt-host` overrides `dashboard.mqtt_host`.
 
 Do not run these commands on a machine without camera, gimbal, CAN, and model assets.
 

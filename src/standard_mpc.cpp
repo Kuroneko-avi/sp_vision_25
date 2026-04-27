@@ -1,8 +1,10 @@
 #include <atomic>
 #include <chrono>
+#include <exception>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -20,6 +22,7 @@
 #include "tasks/auto_buff/buff_target.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
 #include "tools/exiter.hpp"
+#include "tools/dashboard_config.hpp"
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
@@ -63,6 +66,28 @@ std::vector<char *> make_cli_argv(std::vector<std::string> & args)
     argv.push_back(arg.data());
   }
   return argv;
+}
+
+std::optional<std::string> cli_option_value(
+  const std::vector<std::string> & args, const std::string & option)
+{
+  const auto prefix = option + "=";
+  for (const auto & arg : args) {
+    if (arg.rfind(prefix, 0) == 0) {
+      return arg.substr(prefix.size());
+    }
+  }
+  return std::nullopt;
+}
+
+tools::dashboard::DashboardConfigOverrides make_dashboard_overrides(
+  const std::vector<std::string> & args, bool force_enabled)
+{
+  tools::dashboard::DashboardConfigOverrides overrides;
+  overrides.force_enabled = force_enabled;
+  overrides.robot_id = cli_option_value(args, "--robot-id");
+  overrides.mqtt_host = cli_option_value(args, "--mqtt-host");
+  return overrides;
 }
 
 #ifdef SP_VISION_ENABLE_DASHBOARD_MQTT
@@ -124,6 +149,8 @@ int main(int argc, char * argv[])
     cli.printMessage();
     return 0;
   }
+  const auto dashboard_config = tools::dashboard::load_dashboard_config(
+    config_path, make_dashboard_overrides(normalized_args, cli.has("dashboard")));
 
   tools::Exiter exiter;
   tools::Plotter plotter;
@@ -147,25 +174,35 @@ int main(int argc, char * argv[])
   auto_buff::Aimer buff_aimer(config_path);
 
 #ifdef SP_VISION_ENABLE_DASHBOARD_MQTT
-  const auto dashboard_enabled = cli.has("dashboard");
+  const auto dashboard_enabled = dashboard_config.enabled;
   std::unique_ptr<tools::MqttBridge> dashboard_bridge;
   std::unique_ptr<tools::dashboard::DashboardParams> dashboard_params;
   std::atomic<bool> dashboard_telemetry_enabled{dashboard_enabled};
   if (dashboard_enabled) {
-    tools::MqttBridgeOptions options;
-    options.server_uri = cli.get<std::string>("mqtt-host");
-    options.robot_id = cli.get<std::string>("robot-id");
-    options.client_id = options.robot_id + "_standard_mpc";
+    try {
+      tools::MqttBridgeOptions options;
+      options.server_uri = dashboard_config.mqtt_host;
+      options.robot_id = dashboard_config.robot_id;
+      options.client_id = options.robot_id + "_standard_mpc";
 
-    dashboard_params = std::make_unique<tools::dashboard::DashboardParams>(planner, buff_aimer);
-    dashboard_bridge = std::make_unique<tools::MqttBridge>(options);
-    dashboard_bridge->start();
-    publish_dashboard_params(*dashboard_bridge, *dashboard_params);
-    tools::logger()->info(
-      "MQTT Dashboard enabled for {} at {}", options.robot_id, options.server_uri);
+      auto next_params = std::make_unique<tools::dashboard::DashboardParams>(planner, buff_aimer);
+      auto next_bridge = std::make_unique<tools::MqttBridge>(options);
+      next_bridge->start();
+      publish_dashboard_params(*next_bridge, *next_params);
+      dashboard_params = std::move(next_params);
+      dashboard_bridge = std::move(next_bridge);
+      tools::logger()->info(
+        "MQTT Dashboard enabled for {} at {}", options.robot_id, options.server_uri);
+    } catch (const std::exception & e) {
+      dashboard_telemetry_enabled.store(false);
+      tools::logger()->warn("MQTT Dashboard disabled: {}", e.what());
+    } catch (...) {
+      dashboard_telemetry_enabled.store(false);
+      tools::logger()->warn("MQTT Dashboard disabled: unknown initialization error");
+    }
   }
 #else
-  if (cli.has("dashboard")) {
+  if (dashboard_config.enabled) {
     tools::logger()->warn("MQTT Dashboard requested but mqtt_bridge was not built");
   }
 #endif

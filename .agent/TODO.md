@@ -15,6 +15,7 @@
 - 2026-04-27 MQTT Dashboard 第二阶段 G/H 合并收口完成：`control/cmd` 统一使用 `command` 字段，`DashboardParams` 完整 payload 通过 `MqttBridge::*_payload` 接口发布，I 阶段可接入业务入口。
 - 2026-04-27 MQTT Dashboard 前端已融合 `preview.html` 布局，参数面板改为基于 `configs/standard3.yaml` 的 schema 目录，非热参数只读展示。
 - 2026-04-27 MQTT Dashboard 生产收口：Dashboard 网络服务与视觉主程序分离，主程序由人工在真实硬件环境启动。
+- 2026-04-27 MQTT Dashboard 启动参数已收敛到 `configs/standard3.yaml` 的 `dashboard` 配置段，CLI 仍可覆盖。
 - 当前没有明确进行中的功能任务；本文件现阶段主要承担“维护面板”和“回填入口”的作用。
 - 历史任务细节已归档到下文，不再在顶部重复展开。
 
