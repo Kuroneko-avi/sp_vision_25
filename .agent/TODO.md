@@ -13,6 +13,7 @@
 - 2026-04-26 MQTT Dashboard 第二阶段 E/F 基线进入合并收尾：Docker smoke 与前端控制面板已对齐，协议裁剪为不承载图像或视频流。
 - 2026-04-26 MQTT Dashboard 第二阶段 H 已实现热调参模型与 Planner/Buff Aimer 线程安全 apply 接口；尚未接入 MQTT/Paho 或业务入口。
 - 2026-04-27 MQTT Dashboard 第二阶段 G/H 合并收口完成：`control/cmd` 统一使用 `command` 字段，`DashboardParams` 完整 payload 通过 `MqttBridge::*_payload` 接口发布，I 阶段可接入业务入口。
+- 2026-04-27 MQTT Dashboard 无硬件 smoke 已接入 `auto_aim_debug_mpc`：支持视频源替代相机、虚拟串口、params/data/control/ack 最小闭环验收。
 - 当前没有明确进行中的功能任务；本文件现阶段主要承担“维护面板”和“回填入口”的作用。
 - 历史任务细节已归档到下文，不再在顶部重复展开。
 

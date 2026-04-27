@@ -34,6 +34,14 @@ scripts/dashboard_runtime_run.sh bash -lc 'MQTT_SERVER_URI=tcp://127.0.0.1:1883 
 docker compose -f docker-compose.dashboard.yml down
 ```
 
+## Hardwareless Control Smoke
+
+```bash
+scripts/dashboard_hardwareless_smoke.sh
+```
+
+The script starts the dashboard broker/http container, creates a virtual `/dev/gimbal` inside the dev container, runs `auto_aim_debug_mpc` with `--mock-runtime --video-source assets/demo/demo.avi --video-loop`, and verifies `data`, `params/schema`, `params/current`, and `control/ack`.
+
 Hardware entrypoints can be launched from the same container:
 
 ```bash
