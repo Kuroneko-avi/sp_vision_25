@@ -1176,6 +1176,7 @@
       const MQTT_PORT = 9001;
       const DEFAULT_ROBOT_ID = "myrobot";
       const MAX_POINTS = 200;
+      const TELEMETRY_WINDOW_MS = 30000;
       const MAX_LOGS = 500;
       const MAX_ACKS = 20;
       const RECONNECT_MS = 2000;
@@ -1217,6 +1218,7 @@
       let topics = buildTopics(activeRobotId);
       let logScrollPaused = false;
       let totalSamples = 0;
+      let lastTelemetryTimestamp = null;
       const fieldSeries = new Map();
       const paramEntries = new Map();
       const paramControls = new Map();
@@ -1536,6 +1538,8 @@
         }
 
         const timestamp = toTimestampMs(message.timestamp);
+        lastTelemetryTimestamp = timestamp;
+        const windowStart = timestamp - TELEMETRY_WINDOW_MS;
         let changed = false;
         for (const [key, value] of Object.entries(telemetry.values)) {
           const numericValue = Number(value);
@@ -1547,9 +1551,7 @@
           }
           const points = fieldSeries.get(key);
           points.push([timestamp, numericValue]);
-          if (points.length > MAX_POINTS) {
-            points.splice(0, points.length - MAX_POINTS);
-          }
+          pruneSeriesPoints(points, windowStart);
           changed = true;
         }
 
@@ -1573,7 +1575,15 @@
 
       function renderChart() {
         const keys = Array.from(fieldSeries.keys());
+        const xAxis =
+          lastTelemetryTimestamp === null
+            ? {}
+            : {
+                min: lastTelemetryTimestamp - TELEMETRY_WINDOW_MS,
+                max: lastTelemetryTimestamp
+              };
         chart.setOption({
+          xAxis,
           legend: {
             data: keys
           },
@@ -1594,6 +1604,15 @@
         updateChartMetrics();
       }
 
+      function pruneSeriesPoints(points, minTimestamp) {
+        while (points.length && points[0][0] < minTimestamp) {
+          points.shift();
+        }
+        if (points.length > MAX_POINTS) {
+          points.splice(0, points.length - MAX_POINTS);
+        }
+      }
+
       function updateChartMetrics() {
         sampleCountLabel.textContent = String(totalSamples);
         seriesCountLabel.textContent = String(fieldSeries.size);
@@ -1602,10 +1621,11 @@
       function clearChart() {
         fieldSeries.clear();
         totalSamples = 0;
+        lastTelemetryTimestamp = null;
         lastDataTimeLabel.textContent = "-";
         chart.setOption(
-          { legend: { data: [] }, series: [] },
-          { replaceMerge: ["legend", "series"] }
+          { xAxis: { min: null, max: null }, legend: { data: [] }, series: [] },
+          { replaceMerge: ["xAxis", "legend", "series"] }
         );
         updateChartMetrics();
         showToast("曲线已清空");
