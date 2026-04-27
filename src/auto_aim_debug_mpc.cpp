@@ -2,11 +2,9 @@
 
 #include <atomic>
 #include <chrono>
-#include <fstream>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -36,73 +34,7 @@ const std::string keys =
   "{dashboard      |                        | 启用 MQTT Dashboard}"
   "{robot-id       | myrobot                | MQTT Dashboard robot id}"
   "{mqtt-host      | tcp://127.0.0.1:1883   | MQTT broker URI}"
-  "{video-source   |                        | 使用视频文件替代真实相机输入}"
-  "{video-loop     |                        | 视频结束后回到第一帧}"
-  "{mock-runtime   |                        | 无硬件 smoke runtime 模式}"
   "{@config-path   | configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
-
-class VideoFrameSource
-{
-public:
-  explicit VideoFrameSource(const std::string & video_path, bool loop)
-  : video_path_(video_path), text_path_(make_text_path(video_path)), loop_(loop), t0_(std::chrono::steady_clock::now())
-  {
-    video_.open(video_path_);
-    if (!video_.isOpened()) {
-      throw std::runtime_error("Failed to open video source: " + video_path_);
-    }
-
-    text_.open(text_path_);
-    has_text_ = text_.is_open();
-  }
-
-  bool read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp, Eigen::Quaterniond & q)
-  {
-    while (true) {
-      video_.read(img);
-      if (!img.empty()) break;
-      if (!loop_) return false;
-
-      video_.set(cv::CAP_PROP_POS_FRAMES, 0);
-      if (has_text_) {
-        text_.clear();
-        text_.seekg(0);
-      }
-    }
-
-    double t = frame_index_ / 30.0;
-    double w = 1.0;
-    double x = 0.0;
-    double y = 0.0;
-    double z = 0.0;
-    if (has_text_ && !(text_ >> t >> w >> x >> y >> z)) {
-      text_.clear();
-      if (loop_) text_.seekg(0);
-    }
-
-    timestamp = t0_ + std::chrono::microseconds(static_cast<int64_t>(t * 1e6));
-    q = Eigen::Quaterniond(w, x, y, z).normalized();
-    ++frame_index_;
-    return true;
-  }
-
-private:
-  static std::string make_text_path(const std::string & video_path)
-  {
-    const auto dot = video_path.find_last_of('.');
-    if (dot == std::string::npos) return video_path + ".txt";
-    return video_path.substr(0, dot) + ".txt";
-  }
-
-  std::string video_path_;
-  std::string text_path_;
-  bool loop_;
-  cv::VideoCapture video_;
-  std::ifstream text_;
-  bool has_text_{false};
-  int frame_index_{0};
-  std::chrono::steady_clock::time_point t0_;
-};
 
 std::vector<std::string> normalize_cli_args(int argc, char * argv[])
 {
@@ -110,8 +42,7 @@ std::vector<std::string> normalize_cli_args(int argc, char * argv[])
   normalized.reserve(argc);
   for (int i = 0; i < argc; ++i) {
     const std::string arg = argv[i];
-    if ((arg == "--robot-id" || arg == "--mqtt-host" || arg == "--video-source") &&
-        i + 1 < argc) {
+    if ((arg == "--robot-id" || arg == "--mqtt-host") && i + 1 < argc) {
       normalized.push_back(arg + "=" + argv[++i]);
     } else {
       normalized.push_back(arg);
@@ -192,22 +123,11 @@ int main(int argc, char * argv[])
     cli.printMessage();
     return 0;
   }
-  
-  const auto video_source = cli.get<std::string>("video-source");
-  const auto video_loop = cli.has("video-loop");
-  const auto mock_runtime = cli.has("mock-runtime");
 
   io::Gimbal gimbal(config_path);
-  std::unique_ptr<io::Camera> camera;
-  std::unique_ptr<VideoFrameSource> video;
-  if (!video_source.empty()) {
-    video = std::make_unique<VideoFrameSource>(video_source, video_loop);
-    tools::logger()->info("Using video source {}{}", video_source, video_loop ? " with loop" : "");
-  } else {
-    camera = std::make_unique<io::Camera>(config_path);
-  }
+  io::Camera camera(config_path);
 
-  auto_aim::YOLO yolo(config_path, !mock_runtime);
+  auto_aim::YOLO yolo(config_path, true);
   auto_aim::Solver solver(config_path);
   auto_aim::Tracker tracker(config_path, solver);
   auto_aim::Planner planner(config_path);
@@ -314,12 +234,8 @@ int main(int argc, char * argv[])
 #endif
 
     Eigen::Quaterniond q;
-    if (video) {
-      if (!video->read(img, t, q)) break;
-    } else {
-      camera->read(img, t);
-      q = gimbal.q(t-std::chrono::milliseconds(6));
-    }
+    camera.read(img, t);
+    q = gimbal.q(t-std::chrono::milliseconds(6));
 
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
@@ -366,12 +282,10 @@ int main(int argc, char * argv[])
       tools::draw_points(img, image_points, {0, 0, 255});
     }
 
-    if (!mock_runtime) {
-      cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
-      cv::imshow("reprojection", img);
-      auto key = cv::waitKey(1);
-      if (key == 'q') break;
-    }
+    cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+    cv::imshow("reprojection", img);
+    auto key = cv::waitKey(1);
+    if (key == 'q') break;
   }
 
   quit = true;

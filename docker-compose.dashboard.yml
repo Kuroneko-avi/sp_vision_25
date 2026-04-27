@@ -1,10 +1,9 @@
 services:
-  dashboard-smoke:
+  dashboard-net:
     build:
       context: .
       dockerfile: docker/dashboard/Dockerfile
-    environment:
-      ROBOT_ID: ${ROBOT_ID:-myrobot}
+    container_name: sp_vision_dashboard_net
     ports:
       - "1883:1883"
       - "9001:9001"

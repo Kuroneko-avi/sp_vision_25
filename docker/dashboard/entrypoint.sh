@@ -54,7 +54,6 @@ main() {
 
   start_process mosquitto mosquitto -c /etc/mosquitto/mosquitto.conf
   start_process http python3 -m http.server 8080 --bind 0.0.0.0 --directory /app/dashboard
-  start_process mock-publisher python3 /usr/local/bin/mock_publisher.py
 
   monitor_processes
 }

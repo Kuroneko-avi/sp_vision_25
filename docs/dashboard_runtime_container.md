@@ -1,66 +1,92 @@
-# Dashboard Runtime Container
+# Dashboard Production Runtime
 
-This container is for building the C++ dashboard integration and running local MQTT smoke checks without installing dependencies on the WSL host.
+Dashboard production runtime is split into two independent services:
 
-## Build
+- `dashboard-net`: Mosquitto native MQTT, MQTT over WebSocket, and static HTTP Dashboard.
+- vision app: `standard_mpc` or `auto_aim_debug_mpc`, started separately with real camera, gimbal, CAN, model, and config dependencies.
 
-```bash
-scripts/dashboard_runtime_build.sh
-```
+The two sides communicate only through MQTT topics.
 
-Equivalent manual commands:
-
-```bash
-docker compose -f docker-compose.dev.yml build
-docker compose -f docker-compose.dev.yml run --rm sp-vision-dev \
-  bash -lc 'cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target auto_aim_debug_mpc standard_mpc mqtt_bridge_smoke dashboard_params_test -j"$(nproc)"'
-```
-
-The repository is mounted at `/app`; the image does not copy the source tree as the primary build input.
-
-## Run Shell
-
-```bash
-scripts/dashboard_runtime_run.sh bash
-```
-
-The dev service uses host networking so `tcp://127.0.0.1:1883` reaches the dashboard smoke broker started on the host.
-
-## Local Smoke
+## Start Dashboard Network
 
 ```bash
 docker compose -f docker-compose.dashboard.yml up -d --build
-scripts/dashboard_runtime_run.sh bash -lc 'MQTT_SERVER_URI=tcp://127.0.0.1:1883 MQTT_ROBOT_ID=myrobot ./build/mqtt_bridge_smoke'
+```
+
+Equivalent script:
+
+```bash
+scripts/dashboard_net_up.sh
+```
+
+This starts:
+
+- native MQTT: `tcp://127.0.0.1:1883`
+- MQTT over WebSocket: `ws://127.0.0.1:9001`
+- Dashboard HTTP: `http://127.0.0.1:8080`
+
+Stop it with:
+
+```bash
 docker compose -f docker-compose.dashboard.yml down
 ```
 
-## Hardwareless Control Smoke
+Equivalent script:
 
 ```bash
-scripts/dashboard_hardwareless_smoke.sh
+scripts/dashboard_net_down.sh
 ```
 
-The script starts the dashboard broker/http container, creates a virtual `/dev/gimbal` inside the dev container, runs `auto_aim_debug_mpc` with `--mock-runtime --video-source assets/demo/demo.avi --video-loop`, and verifies `data`, `params/schema`, `params/current`, and `control/ack`.
+## Start Vision App
 
-For manual browser inspection, use the long-running hardwareless runtime:
+Start the real vision program outside the Dashboard container:
 
 ```bash
-scripts/dashboard_hardwareless_run.sh
+./build/standard_mpc \
+  --dashboard \
+  --robot-id myrobot \
+  --mqtt-host tcp://127.0.0.1:1883 \
+  configs/standard3.yaml
 ```
 
-It starts the same broker/http stack and virtual `/dev/gimbal`, then keeps `auto_aim_debug_mpc` running with the demo video loop until Ctrl+C. Override inputs with environment variables:
+or:
 
 ```bash
-ROBOT_ID=myrobot VIDEO_SOURCE=assets/demo/demo.avi scripts/dashboard_hardwareless_run.sh
+./build/auto_aim_debug_mpc \
+  --dashboard \
+  --robot-id myrobot \
+  --mqtt-host tcp://127.0.0.1:1883 \
+  configs/standard3.yaml
 ```
 
-The parameter panel is schema-driven. MPC entrypoints publish a catalog derived from `configs/standard3.yaml`: hot Planner/Buff Aimer fields are editable, while the remaining scalar, array, matrix, and calibration values are displayed as read-only restart-required configuration.
+If the vision app runs in another Docker container, prefer host networking:
 
-Hardware entrypoints can be launched from the same container:
+- `network_mode: host`
+- vision app connects to `tcp://127.0.0.1:1883`
+- browser opens `http://<host-ip>:8080`
+- Dashboard WebSocket URL is `ws://<host-ip>:9001`
 
-```bash
-scripts/dashboard_runtime_run.sh ./build/auto_aim_debug_mpc --dashboard --robot-id myrobot --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
-scripts/dashboard_runtime_run.sh ./build/standard_mpc --dashboard --robot-id myrobot --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
-```
+## Extra Dependencies For Dashboard Feature
 
-On a machine without camera, serial, CAN, or model assets, those programs may stop before full closed-loop runtime. Record the exact error instead of treating that as a pass.
+Vision app build/runtime needs:
+
+- `libpaho-mqtt-dev`
+- `libpaho-mqttpp-dev`
+- `nlohmann-json3-dev`, unless the image already provides `nlohmann/json.hpp`
+
+`dashboard-net` container needs:
+
+- `mosquitto`
+- static HTTP server; current image uses `python3 -m http.server`
+
+Optional debug tools:
+
+- `mosquitto-clients`
+
+## Frontend Assets
+
+`dashboard/index.html` currently loads `mqtt.js` and ECharts from CDN. If the production network has no external internet access, vendor these assets into `dashboard/vendor/` in a separate task.
+
+## Production Boundary
+
+The production startup path no longer includes video-file runtime, virtual serial runtime, dev build container, or mock publisher entrypoints. Start the real vision app manually in its own environment.

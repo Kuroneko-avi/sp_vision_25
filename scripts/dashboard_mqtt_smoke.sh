@@ -118,7 +118,7 @@ main() {
   fi
 
   printf 'smoke test 通过：本机 1883 原生 MQTT 可用。\n'
-  printf '说明：9001 WebSocket MQTT 第一阶段只做端口/配置检测，请运行 scripts/dashboard_mqtt_check.sh。\n'
+  printf '说明：1883/9001/8080 端口与 HTTP 检测请运行 scripts/dashboard_mqtt_check.sh。\n'
 }
 
 main "$@"

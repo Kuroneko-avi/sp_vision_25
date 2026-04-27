@@ -1,100 +1,70 @@
-# Dashboard Docker Smoke
+# Dashboard Network Smoke
 
-本文档用于第二阶段任务 E：在不运行真实 C++ 视觉程序的情况下，用单容器验证 MQTT native、MQTT over WebSocket、HTTP Dashboard 与 mock telemetry 链路。
+This smoke check validates only the production `dashboard-net` container. It does not start a vision program or telemetry publisher.
 
-## 启动
-
-默认 `ROBOT_ID` 为 `myrobot`：
+## Start
 
 ```bash
-docker compose -f docker-compose.dashboard.yml up --build
+docker compose -f docker-compose.dashboard.yml up -d --build
 ```
 
-覆盖 `ROBOT_ID`：
+Equivalent script:
 
 ```bash
-ROBOT_ID=hero docker compose -f docker-compose.dashboard.yml up --build
+scripts/dashboard_net_up.sh
 ```
 
-容器内会同时启动：
+The container exposes:
 
-- Mosquitto native MQTT：`1883`
-- Mosquitto MQTT over WebSocket：`9001`
-- 静态 HTTP server：`8080`
-- mock telemetry publisher：每秒向 `{ROBOT_ID}/data` 发布 QoS 0 JSON
+- Mosquitto native MQTT: `1883`
+- Mosquitto MQTT over WebSocket: `9001`
+- static Dashboard HTTP: `8080`
 
-mock payload 使用正式协议字段 `values`：
-
-```json
-{"timestamp":1770000000000,"values":{"speed":2.5,"temp":42.0}}
-```
-
-## 访问 Dashboard
-
-在浏览器打开：
-
-```text
-http://主机IP:8080
-```
-
-本机访问可用：
+## Open Dashboard
 
 ```text
 http://127.0.0.1:8080
 ```
 
-Dashboard 页面中：
+Use these frontend connection values when running locally:
 
-- `Broker Host` 填主机 IP 或 `127.0.0.1`。
-- `Robot ID` 默认填 `myrobot`，若启动时覆盖了 `ROBOT_ID`，这里也填同一个值。
-- 点击 `Connect` 后，前端会通过 `ws://<Broker Host>:9001` 订阅 `{ROBOT_ID}/data`。
+- Broker URL: `ws://127.0.0.1:9001`
+- Robot ID: `myrobot`
 
-## 确认端口
+The page will show telemetry and parameters after a separately started vision app publishes MQTT messages.
 
-宿主机检查端口：
-
-```bash
-ss -ltn '( sport = :1883 or sport = :9001 or sport = :8080 )'
-```
-
-HTTP 检查：
+## Check Ports
 
 ```bash
 curl -I http://127.0.0.1:8080
-```
-
-Compose 配置检查：
-
-```bash
+ss -ltn '( sport = :1883 or sport = :9001 or sport = :8080 )'
 docker compose -f docker-compose.dashboard.yml config
 ```
 
-## 查看 mock telemetry 日志
-
-前台启动时日志会直接输出。后台启动时可查看：
+Optional native MQTT loopback if `mosquitto-clients` is installed:
 
 ```bash
-docker compose -f docker-compose.dashboard.yml logs -f dashboard-smoke
+mosquitto_sub -h 127.0.0.1 -p 1883 -t sp_vision_25/dashboard/smoke -C 1 &
+mosquitto_pub -h 127.0.0.1 -p 1883 -t sp_vision_25/dashboard/smoke -m '{"ok":true}'
 ```
 
-日志中应出现类似：
-
-```text
-[mock_publisher] myrobot/data {"timestamp":...,"values":{"speed":...,"temp":...}}
-```
-
-## 停止
-
-前台运行时按 `Ctrl-C`。后台运行时执行：
+## Stop
 
 ```bash
 docker compose -f docker-compose.dashboard.yml down
 ```
 
-`entrypoint.sh` 会在收到 `SIGTERM` / `SIGINT` 后终止 Mosquitto、HTTP server 与 mock publisher，并等待子进程退出。
+Equivalent script:
 
-## 当前环境未验证项
+```bash
+scripts/dashboard_net_down.sh
+```
 
-截至 2026-04-26，如果本机缺少 Docker 或网络无法拉取镜像/安装 Python 依赖，则只能完成静态检查，不能完成真实容器 smoke test。
+## Production Boundary
 
-若本机缺少 `mosquitto_pub` / `mosquitto_sub`，不影响容器内 mock telemetry，但无法在宿主机直接用 mosquitto clients 订阅验证 `1883`。
+`dashboard-net` does not:
+
+- start `standard_mpc` or `auto_aim_debug_mpc`
+- publish telemetry by itself
+- access camera, serial, CAN, OpenVINO, or model files
+- mount hardware devices
