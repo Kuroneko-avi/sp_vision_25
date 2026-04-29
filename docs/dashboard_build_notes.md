@@ -65,4 +65,4 @@ Do not run these commands on a machine without camera, gimbal, CAN, and model as
 
 ## Frontend Assets
 
-`dashboard/index.html` currently loads `mqtt.js` and ECharts from CDN. Production networks without external internet access should vendor those assets into `dashboard/vendor/` in a separate task.
+`dashboard/index.html` loads local vendor assets from `dashboard/vendor/`: MQTT.js, ECharts, and GridStack. Versions and source URLs are recorded in `dashboard/vendor/README.md`; no npm build step is required.

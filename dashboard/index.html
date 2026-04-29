@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SP Vision MQTT 控制台</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <title>Combat 控制台</title>
+  <link rel="stylesheet" href="./vendor/gridstack/gridstack.min.css">
   <link rel="stylesheet" href="./css/dashboard.css">
-
+  <script src="./vendor/mqtt/mqtt.min.js"></script>
+  <script src="./vendor/echarts/echarts.min.js"></script>
+  <script src="./vendor/gridstack/gridstack-all.js"></script>
 </head>
 <body>
   <div class="app">
@@ -16,7 +17,7 @@
         <div class="brand-mark" aria-hidden="true">SP</div>
         <div class="brand-text">
           <strong>SP Vision 控制台</strong>
-          <span>MQTT 遥测 · 参数调试 · 运行日志</span>
+          <span>MQTT 遥测 · 参数调试 · Panel 工作台</span>
         </div>
       </div>
 
@@ -42,168 +43,11 @@
       </div>
     </header>
 
-    <section class="workflow-strip" aria-label="使用流程">
-      <div class="workflow-card">
-        <div class="workflow-step">1</div>
-        <div><strong>连接 Broker</strong><span>确认 WebSocket 地址与 Robot ID，连接后自动订阅全部 topic。</span></div>
-      </div>
-      <div class="workflow-card">
-        <div class="workflow-step">2</div>
-        <div><strong>观察遥测</strong><span>实时曲线用于看趋势；需要重新开始分析时可清空曲线。</span></div>
-      </div>
-      <div class="workflow-card">
-        <div class="workflow-step">3</div>
-        <div><strong>调整参数</strong><span>修改后进入“待应用”状态，可单独应用或批量应用。</span></div>
-      </div>
-      <div class="workflow-card">
-        <div class="workflow-step">4</div>
-        <div><strong>检查回执</strong><span>每次命令/调参都会在回执和日志中留下可追踪记录。</span></div>
-      </div>
-    </section>
-
-    <main>
-      <div class="stack">
-        <section class="panel featured" aria-label="遥测曲线">
-          <header>
-            <div class="title-block">
-              <h1 class="panel-title">遥测曲线</h1>
-              <span class="panel-subtitle">实时绘制数值字段，适合观察 yaw、pitch、fps、误差等连续量。</span>
-            </div>
-            <div class="panel-actions">
-              <span id="telemetry-topic" class="topic-pill">myrobot/data</span>
-              <button id="clear-chart" class="secondary" type="button">清空曲线</button>
-            </div>
-          </header>
-          <div class="chart-body">
-            <div id="chart"></div>
-          </div>
-          <div id="series-filter" class="series-filter" aria-label="曲线显示控制"></div>
-          <div class="metrics">
-            <div class="metric">
-              <span>Samples</span>
-              <strong id="sample-count">0</strong>
-            </div>
-            <div class="metric">
-              <span>Series</span>
-              <strong id="series-count">0</strong>
-            </div>
-            <div class="metric">
-              <span>Last Data</span>
-              <strong id="last-data-time">-</strong>
-            </div>
-            <div class="metric">
-              <span>Source</span>
-              <strong id="telemetry-source">values</strong>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel" aria-label="参数控制">
-          <header>
-            <div class="title-block">
-              <h2 class="panel-title">参数控制</h2>
-              <span class="panel-subtitle">根据 params/schema 自动生成控件，修改后点击“应用”。</span>
-            </div>
-            <span id="params-meta" class="topic-pill">等待 schema</span>
-          </header>
-          <div class="param-toolbar">
-            <div class="filter-row">
-              <input id="param-filter" type="search" placeholder="搜索参数名、分组或类型..." autocomplete="off">
-              <button id="reset-param-filter" class="secondary" type="button">重置搜索</button>
-            </div>
-            <div class="param-changebar" aria-live="polite">
-              <span id="dirty-param-count" class="change-count">待应用：<strong>0</strong></span>
-              <div class="panel-actions">
-                <button id="apply-dirty-params" class="primary" type="button" disabled>应用全部修改</button>
-                <button id="reset-dirty-params" class="secondary" type="button" disabled>撤销修改</button>
-              </div>
-            </div>
-          </div>
-          <div id="params-list" class="param-list">
-            <div class="empty-state"><div><strong>还没有参数 schema</strong><span>连接设备后，点击右侧“刷新参数”，等待 params/schema 与 params/current 到达。</span></div></div>
-          </div>
-        </section>
-      </div>
-
-      <div class="stack">
-        <section class="panel" aria-label="控制命令">
-          <header>
-            <div class="title-block">
-              <h2 class="panel-title">控制命令</h2>
-              <span class="panel-subtitle">向机器人控制 topic 发布常用指令。</span>
-            </div>
-            <span id="command-topic" class="topic-pill">myrobot/control/cmd</span>
-          </header>
-          <div class="command-body">
-            <div class="command-grid">
-              <div class="command-card">
-                <div>
-                  <strong>启动 Dashboard</strong>
-                  <span>发布 start_dashboard，恢复数据与控制服务。</span>
-                </div>
-                <button class="primary command-button" type="button" data-command="start_dashboard">启动</button>
-              </div>
-              <div class="command-card">
-                <div>
-                  <strong>停止 Dashboard</strong>
-                  <span>发布 stop_dashboard。该操作会先弹窗确认，避免误触。</span>
-                </div>
-                <button class="danger command-button" type="button" data-command="stop_dashboard">停止</button>
-              </div>
-              <div class="command-card">
-                <div>
-                  <strong>重新发布参数</strong>
-                  <span>让下位/服务端重新广播 schema 与当前值。</span>
-                </div>
-                <button class="secondary command-button" type="button" data-command="republish_params">刷新参数</button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel" aria-label="控制确认">
-          <header>
-            <div class="title-block">
-              <h2 class="panel-title">控制回执</h2>
-              <span class="panel-subtitle">显示最近的参数或命令执行结果。</span>
-            </div>
-            <span id="ack-topic" class="topic-pill">myrobot/control/ack</span>
-          </header>
-          <div id="ack-list" class="ack-list">
-            <div class="empty-state"><div><strong>暂无控制回执</strong><span>发送命令或应用参数后，这里会显示成功/失败结果。</span></div></div>
-          </div>
-        </section>
-
-        <section class="panel" aria-label="运行日志">
-          <header>
-            <div class="title-block">
-              <h2 class="panel-title">运行日志</h2>
-              <span class="panel-subtitle">系统消息和机器人日志都会显示在这里。</span>
-            </div>
-            <div class="log-toolbar">
-              <select id="log-level-filter" aria-label="日志级别筛选">
-                <option value="all">全部日志</option>
-                <option value="debug">Debug</option>
-                <option value="info">Info</option>
-                <option value="warn">Warn+</option>
-                <option value="error">Error+</option>
-              </select>
-              <button id="toggle-log-scroll" class="secondary" type="button">暂停滚动</button>
-              <button id="copy-log" class="secondary" type="button">复制日志</button>
-              <button id="clear-log" class="secondary" type="button">清空日志</button>
-            </div>
-          </header>
-          <div id="log-list" class="log-body">
-            <div class="empty-state"><div><strong>暂无运行日志</strong><span>连接、订阅、发布、解析异常和机器人日志都会显示在这里。</span></div></div>
-          </div>
-        </section>
-      </div>
-    </main>
+    <main id="dashboard-grid" class="grid-stack" aria-label="Dashboard panel workspace"></main>
   </div>
 
   <div id="toast-wrap" class="toast-wrap" aria-live="polite"></div>
 
   <script type="module" src="./js/app.js"></script>
-
 </body>
 </html>

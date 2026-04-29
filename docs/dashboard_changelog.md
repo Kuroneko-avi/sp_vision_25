@@ -5,7 +5,7 @@
 ## 变更摘要
 
 - 新增浏览器 Dashboard：`dashboard/index.html`。
-- Dashboard 前端已拆为静态多文件结构：HTML、CSS 与 ES module JS 分离，仍由容器内静态 HTTP server 直接 serve，不需要 npm build。
+- Dashboard 前端已从静态多文件升级为轻量 panel 工作台：使用 GridStack 管理可拖拽、可缩放 panel，仍由容器内静态 HTTP server 直接 serve，不需要 npm build。
 - 新增独立 Dashboard 网络服务容器：`docker-compose.dashboard.yml`、`docker/dashboard/*`。
 - 新增 MQTT 通信层：`tools/mqtt_bridge.*`、`tools/dashboard_mqtt_contract.hpp`。
 - 新增 Dashboard 参数模型：`tools/dashboard_params.*`、`tools/dashboard_config.*`。
@@ -53,14 +53,27 @@ Dashboard 网络服务容器内部依赖：
 sudo apt install -y mosquitto-clients
 ```
 
-前端当前从 CDN 加载 `mqtt.js` 和 ECharts。若生产网络不能访问外网，需要后续把这两个文件 vendoring 到本地 `dashboard/vendor/`。
+前端依赖已 vendor 到本地 `dashboard/vendor/`：
+
+- `mqtt.js`：`dashboard/vendor/mqtt/mqtt.min.js`
+- ECharts：`dashboard/vendor/echarts/echarts.min.js`
+- GridStack：`dashboard/vendor/gridstack/gridstack-all.js`、`dashboard/vendor/gridstack/gridstack.min.css`
+
+版本和来源记录在 `dashboard/vendor/README.md`。当前前端不再依赖外部 CDN。
 
 前端装修优先修改：
 
-- `dashboard/index.html`：DOM 结构。
 - `dashboard/css/dashboard.css`：视觉样式。
+- `dashboard/js/panels/*`：具体 panel 内容和交互。
 
-MQTT 契约逻辑集中在 `dashboard/js/protocol.js`，包括 topic、QoS、telemetry 解析、参数 payload 校验和 control payload 构造。UI 文件不要绕过 `protocol.js` 直接拼 topic 或 control payload。MQTT.js 连接、订阅、发布和消息分发集中在 `dashboard/js/mqtt_transport.js`。
+当前借鉴 Foxglove/rqt 的 panel registry 思路，核心结构为：
+
+- `dashboard/js/core/panel_registry.js`：注册 panel id、标题、默认尺寸和 mount 方法。
+- `dashboard/js/core/layout_manager.js`：初始化 GridStack 并挂载 panel 容器。
+- `dashboard/js/core/store.js`：保存连接状态、最新 telemetry、params、ack、log 和 Raw MQTT 消息。
+- `dashboard/js/panels/*`：telemetry、params、commands、ack、logs、Raw MQTT 等独立面板。
+
+MQTT 契约逻辑集中在 `dashboard/js/core/protocol.js`，包括 topic、QoS、telemetry 解析、参数 payload 校验和 control payload 构造。Panel 文件不要绕过 `protocol.js` 直接拼 topic 或 control payload。MQTT.js 连接、订阅、发布和消息分发集中在 `dashboard/js/core/mqtt_transport.js`。
 
 当前前端仍是原生静态资源，不引入 Vite、React、Vue 或 npm build。
 

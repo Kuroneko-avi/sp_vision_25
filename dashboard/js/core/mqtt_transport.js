@@ -1,4 +1,4 @@
-import { getSubscriptions, QOS } from "./protocol.js";
+import { classifyTopic, getSubscriptions, QOS } from "./protocol.js";
 
 export const MQTT_PORT = 9001;
 const RECONNECT_MS = 2000;
@@ -99,24 +99,21 @@ export class MqttTransport {
   }
 
   dispatchMessage(topic, payload) {
+    const rawPayload = payload.toString();
+    this.callbacks.onRawMessage?.({ timestamp: Date.now(), topic, payload: rawPayload });
+
     let message;
     try {
-      message = JSON.parse(payload.toString());
+      message = JSON.parse(rawPayload);
     } catch (error) {
       this.callbacks.onInvalidJson?.(topic, error);
       return;
     }
 
-    if (topic === this.topics.data) {
-      this.callbacks.onTelemetry?.(message);
-    } else if (topic === this.topics.log) {
-      this.callbacks.onLog?.(message);
-    } else if (topic === this.topics.paramsSchema) {
-      this.callbacks.onParamsSchema?.(message);
-    } else if (topic === this.topics.paramsCurrent) {
-      this.callbacks.onParamsCurrent?.(message);
-    } else if (topic === this.topics.controlAck) {
-      this.callbacks.onAck?.(message);
-    }
+    this.callbacks.onMessage?.({
+      kind: classifyTopic(topic, this.topics),
+      topic,
+      message
+    });
   }
 }

@@ -1,18 +1,12 @@
-import { buildControlParamPayload, QOS, validateParamsCurrent, validateParamsSchema } from "./protocol.js";
-import { escapeHtml, formatRawValue } from "./ui_state.js";
+import { buildControlParamPayload, QOS, validateParamsCurrent } from "../core/protocol.js";
+import { escapeHtml, formatRawValue } from "./shared.js";
 
-export class ParamsPanel {
-  constructor({ publishJson, onLog, onToast }) {
+export class ParamsEditorPanel {
+  constructor(root, { publishJson, store, toast }) {
+    this.root = root;
     this.publishJson = publishJson;
-    this.onLog = onLog;
-    this.onToast = onToast;
-    this.paramsMeta = document.getElementById("params-meta");
-    this.paramsList = document.getElementById("params-list");
-    this.paramFilterInput = document.getElementById("param-filter");
-    this.resetParamFilterButton = document.getElementById("reset-param-filter");
-    this.dirtyParamCountLabel = document.getElementById("dirty-param-count");
-    this.applyDirtyParamsButton = document.getElementById("apply-dirty-params");
-    this.resetDirtyParamsButton = document.getElementById("reset-dirty-params");
+    this.store = store;
+    this.toast = toast;
     this.paramEntries = new Map();
     this.paramControls = new Map();
     this.currentParamValues = new Map();
@@ -20,15 +14,11 @@ export class ParamsPanel {
     this.draftParamValues = new Map();
     this.pendingParamRequests = new Map();
     this.ready = false;
-    this.hasClient = false;
-
-    this.paramFilterInput.addEventListener("input", () => this.renderParams());
-    this.resetParamFilterButton.addEventListener("click", () => {
-      this.paramFilterInput.value = "";
-      this.renderParams();
-    });
-    this.applyDirtyParamsButton.addEventListener("click", () => this.applyDirtyParams());
-    this.resetDirtyParamsButton.addEventListener("click", () => this.resetDirtyParams());
+    this.renderShell();
+    this.store.subscribe("connection", ({ topics }) => this.updateTopic(topics));
+    this.store.subscribe("paramsSchema", (params) => this.applyParamSchema(params));
+    this.store.subscribe("paramsCurrent", (values) => this.handleParamCurrentValues(values));
+    this.updateTopic(this.store.getState().topics);
     window.addEventListener("beforeunload", (event) => {
       if (!this.dirtyParams.size) {
         return;
@@ -38,17 +28,55 @@ export class ParamsPanel {
     });
   }
 
-  setConnectedState(ready, hasClient) {
+  renderShell() {
+    this.root.innerHTML = `
+      <div class="panel-inline-toolbar"><span class="topic-pill" data-role="topic">等待 schema</span></div>
+      <div class="param-toolbar">
+        <div class="filter-row">
+          <input data-role="filter" type="search" placeholder="搜索参数名、分组或类型..." autocomplete="off">
+          <button data-role="reset-filter" class="secondary" type="button">重置搜索</button>
+        </div>
+        <div class="param-changebar" aria-live="polite">
+          <span data-role="dirty-count" class="change-count">待应用：<strong>0</strong></span>
+          <div class="panel-actions">
+            <button data-role="apply-all" class="primary" type="button" disabled>应用全部修改</button>
+            <button data-role="reset-all" class="secondary" type="button" disabled>撤销修改</button>
+          </div>
+        </div>
+      </div>
+      <div class="param-list" data-role="list"></div>
+    `;
+    this.paramsMeta = this.root.querySelector('[data-role="topic"]');
+    this.paramsList = this.root.querySelector('[data-role="list"]');
+    this.paramFilterInput = this.root.querySelector('[data-role="filter"]');
+    this.dirtyParamCountLabel = this.root.querySelector('[data-role="dirty-count"]');
+    this.applyDirtyParamsButton = this.root.querySelector('[data-role="apply-all"]');
+    this.resetDirtyParamsButton = this.root.querySelector('[data-role="reset-all"]');
+    this.paramFilterInput.addEventListener("input", () => this.renderParams());
+    this.root.querySelector('[data-role="reset-filter"]').addEventListener("click", () => {
+      this.paramFilterInput.value = "";
+      this.renderParams();
+    });
+    this.applyDirtyParamsButton.addEventListener("click", () => this.applyDirtyParams());
+    this.resetDirtyParamsButton.addEventListener("click", () => this.resetDirtyParams());
+    this.renderParams();
+  }
+
+  updateTopic(topics) {
+    if (!this.paramEntries.size) {
+      this.paramsMeta.textContent = `${topics.paramsSchema} / ${topics.paramsCurrent}`;
+    }
+  }
+
+  setConnectedState(ready) {
     this.ready = ready;
-    this.hasClient = hasClient;
     this.paramControls.forEach(({ entry, apply }) => {
       apply.disabled = !ready || !this.isParamEditable(entry);
     });
     this.updateDirtySummary();
   }
 
-  handleParamSchema(message) {
-    const params = validateParamsSchema(message);
+  applyParamSchema(params) {
     this.paramEntries.clear();
     for (const param of params) {
       const entry = { ...param };
@@ -64,10 +92,13 @@ export class ParamsPanel {
   handleParamCurrent(message) {
     const values = validateParamsCurrent(message);
     if (!values) {
-      this.onLog?.("warn", "params/current payload missing values object");
+      this.store.appendLog({ timestamp: Date.now(), level: "warn", message: "params/current payload missing values object" });
       return;
     }
+    this.store.setParamsCurrent(values);
+  }
 
+  handleParamCurrentValues(values) {
     for (const [key, value] of Object.entries(values)) {
       this.currentParamValues.set(key, value);
       const entry = this.paramEntries.get(key);
@@ -91,11 +122,9 @@ export class ParamsPanel {
   renderParams() {
     this.paramControls.clear();
     this.paramsList.innerHTML = "";
-
     if (!this.paramEntries.size) {
-      this.paramsList.innerHTML = '<div class="empty-state"><div><strong>还没有参数 schema</strong><span>连接设备后，点击右侧“刷新参数”，等待 params/schema 与 params/current 到达。</span></div></div>';
-      this.updateParamsMeta();
-      this.setConnectedState(this.ready, this.hasClient);
+      this.paramsList.innerHTML = '<div class="empty-state"><div><strong>还没有参数 schema</strong><span>连接设备后，点击“刷新参数”，等待 params/schema 与 params/current 到达。</span></div></div>';
+      this.updateDirtySummary();
       return;
     }
 
@@ -118,7 +147,6 @@ export class ParamsPanel {
     if (!visibleCount) {
       this.paramsList.innerHTML = '<div class="empty-state"><div><strong>没有匹配的参数</strong><span>换一个关键词，或点击“重置搜索”查看全部参数。</span></div></div>';
       this.updateParamsMeta(0);
-      this.setConnectedState(this.ready, this.hasClient);
       return;
     }
 
@@ -135,7 +163,7 @@ export class ParamsPanel {
       this.paramsList.appendChild(groupNode);
     }
     this.updateParamsMeta(visibleCount);
-    this.setConnectedState(this.ready, this.hasClient);
+    this.setConnectedState(this.ready);
   }
 
   createParamRow(entry) {
@@ -143,7 +171,6 @@ export class ParamsPanel {
     const row = document.createElement("div");
     row.className = "param-row";
     row.dataset.key = entry.key;
-
     const status = document.createElement("div");
     status.className = "param-status";
     const name = document.createElement("div");
@@ -159,7 +186,6 @@ export class ParamsPanel {
     paramState.className = "param-state synced";
     paramState.textContent = "已同步";
     status.append(name, currentValue, detail, paramState);
-
     const inputs = document.createElement("div");
     inputs.className = "param-inputs";
     const apply = document.createElement("button");
@@ -167,41 +193,12 @@ export class ParamsPanel {
     apply.type = "button";
     apply.textContent = editable ? "应用" : "只读";
     apply.disabled = !editable;
-
     const inputEntry = this.dirtyParams.has(entry.key) ? { ...entry, value: this.draftParamValues.get(entry.key) } : entry;
     const controls = this.buildParamInputs(inputEntry);
     inputs.classList.toggle("single", controls.length === 1);
     controls.forEach((control) => inputs.appendChild(control));
     apply.addEventListener("click", () => this.publishParam(entry.key));
-
-    if (editable) {
-      for (const control of controls) {
-        const input = control.matches?.("input, select, textarea")
-          ? control
-          : control.querySelector?.("input, select, textarea");
-        if (input) {
-          input.addEventListener("input", () => this.markParamDirty(entry.key, true));
-          input.addEventListener("change", () => this.markParamDirty(entry.key, true));
-          input.addEventListener("keydown", (event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              this.publishParam(entry.key);
-            }
-          });
-        }
-      }
-    } else {
-      for (const control of controls) {
-        const input = control.matches?.("input, select, textarea")
-          ? control
-          : control.querySelector?.("input, select, textarea");
-        if (input) {
-          input.disabled = true;
-          input.readOnly = true;
-        }
-      }
-    }
-
+    this.bindParamControls(entry, controls, editable);
     row.append(status, inputs, apply);
     this.paramControls.set(entry.key, { entry, row, controls, currentValue, paramState, apply });
     if (!editable) {
@@ -212,6 +209,30 @@ export class ParamsPanel {
       this.setParamState(entry.key, "pending", "等待回执");
     }
     return row;
+  }
+
+  bindParamControls(entry, controls, editable) {
+    for (const control of controls) {
+      const input = control.matches?.("input, select, textarea")
+        ? control
+        : control.querySelector?.("input, select, textarea");
+      if (!input) {
+        continue;
+      }
+      if (editable) {
+        input.addEventListener("input", () => this.markParamDirty(entry.key, true));
+        input.addEventListener("change", () => this.markParamDirty(entry.key, true));
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            this.publishParam(entry.key);
+          }
+        });
+      } else {
+        input.disabled = true;
+        input.readOnly = true;
+      }
+    }
   }
 
   getParamDetail(entry) {
@@ -261,7 +282,7 @@ export class ParamsPanel {
       this.setParamState(key, "synced", "已同步");
     }
     this.updateDirtySummary();
-    this.setConnectedState(this.ready, this.hasClient);
+    this.setConnectedState(this.ready);
   }
 
   setParamState(key, state, text) {
@@ -303,7 +324,6 @@ export class ParamsPanel {
       textarea.readOnly = !editable;
       return [textarea];
     }
-
     if (entry.type === "number") {
       const range = document.createElement("input");
       range.type = "range";
@@ -326,7 +346,6 @@ export class ParamsPanel {
       });
       return [range, number];
     }
-
     if (entry.type === "bool") {
       const wrap = document.createElement("label");
       wrap.className = "bool-input";
@@ -342,7 +361,6 @@ export class ParamsPanel {
       wrap.append(checkbox, label);
       return [wrap];
     }
-
     if (entry.type === "enum") {
       const select = document.createElement("select");
       select.disabled = !editable;
@@ -362,7 +380,6 @@ export class ParamsPanel {
       select.value = String(entry.value ?? "");
       return [select];
     }
-
     const input = document.createElement("input");
     input.type = "text";
     input.value = formatRawValue(entry.value);
@@ -421,14 +438,14 @@ export class ParamsPanel {
       return;
     }
     if (!this.isParamEditable(control.entry)) {
-      this.onLog?.("warn", `${key}: read-only parameter`);
-      this.onToast?.(`${key} 当前为只读参数`, "warn");
+      this.store.appendLog({ timestamp: Date.now(), level: "warn", message: `${key}: read-only parameter` });
+      this.toast(`${key} 当前为只读参数`, "warn");
       return;
     }
     const value = this.readParamValue(control);
     if (control.entry.type === "number" && !Number.isFinite(value)) {
-      this.onLog?.("warn", `${key}: invalid number`);
-      this.onToast?.(`${key} 不是有效数字`, "warn");
+      this.store.appendLog({ timestamp: Date.now(), level: "warn", message: `${key}: invalid number` });
+      this.toast(`${key} 不是有效数字`, "warn");
       return;
     }
     const payload = buildControlParamPayload(key, value);
@@ -445,7 +462,7 @@ export class ParamsPanel {
 
   applyDirtyParams() {
     if (!this.dirtyParams.size) {
-      this.onToast?.("没有待应用的参数", "warn");
+      this.toast("没有待应用的参数", "warn");
       return;
     }
     for (const key of Array.from(this.dirtyParams)) {
@@ -472,7 +489,7 @@ export class ParamsPanel {
       this.setParamState(key, "synced", "已同步");
     }
     this.updateDirtySummary();
-    this.onToast?.("已撤销未应用修改");
+    this.toast("已撤销未应用修改");
   }
 
   readParamValue(control) {

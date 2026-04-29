@@ -1,29 +1,50 @@
-import { parseTelemetryPayload } from "./protocol.js";
-import { formatTime, toTimestampMs } from "./ui_state.js";
+import { parseTelemetryPayload } from "../core/protocol.js";
+import { formatTime, toTimestampMs } from "./shared.js";
 
 const MAX_POINTS = 200;
 const TELEMETRY_WINDOW_MS = 30000;
 
-export class TelemetryPanel {
-  constructor({ onWarn, onToast }) {
-    this.onWarn = onWarn;
-    this.onToast = onToast;
-    this.chart = echarts.init(document.getElementById("chart"));
-    this.sampleCountLabel = document.getElementById("sample-count");
-    this.seriesCountLabel = document.getElementById("series-count");
-    this.lastDataTimeLabel = document.getElementById("last-data-time");
-    this.telemetrySourceLabel = document.getElementById("telemetry-source");
-    this.seriesFilter = document.getElementById("series-filter");
-    this.clearChartButton = document.getElementById("clear-chart");
+export class TelemetryPlotPanel {
+  constructor(root, { store, toast }) {
+    this.root = root;
+    this.store = store;
+    this.toast = toast;
     this.totalSamples = 0;
     this.lastTelemetryTimestamp = null;
     this.fieldSeries = new Map();
     this.hiddenTelemetrySeries = new Set();
-
+    this.renderShell();
+    this.chart = echarts.init(this.chartNode);
     this.initChart();
+    this.updateTopic(this.store.getState().topics);
     this.updateChartMetrics();
-    window.addEventListener("resize", () => this.chart.resize());
-    this.clearChartButton.addEventListener("click", () => this.clearChart());
+    this.store.subscribe("connection", ({ topics }) => this.updateTopic(topics));
+    this.store.subscribe("telemetry", (message) => this.handleTelemetry(message));
+  }
+
+  renderShell() {
+    this.root.innerHTML = `
+      <div class="panel-inline-toolbar">
+        <span class="topic-pill" data-role="topic">-</span>
+        <button class="secondary" type="button" data-role="clear">清空曲线</button>
+      </div>
+      <div class="chart-body"><div class="telemetry-chart" data-role="chart"></div></div>
+      <div class="series-filter" data-role="series-filter" aria-label="曲线显示控制"></div>
+      <div class="metrics">
+        <div class="metric"><span>Samples</span><strong data-role="sample-count">0</strong></div>
+        <div class="metric"><span>Series</span><strong data-role="series-count">0</strong></div>
+        <div class="metric"><span>Last Data</span><strong data-role="last-data-time">-</strong></div>
+        <div class="metric"><span>Source</span><strong data-role="telemetry-source">values</strong></div>
+      </div>
+    `;
+    this.topicLabel = this.root.querySelector('[data-role="topic"]');
+    this.chartNode = this.root.querySelector('[data-role="chart"]');
+    this.seriesFilter = this.root.querySelector('[data-role="series-filter"]');
+    this.sampleCountLabel = this.root.querySelector('[data-role="sample-count"]');
+    this.seriesCountLabel = this.root.querySelector('[data-role="series-count"]');
+    this.lastDataTimeLabel = this.root.querySelector('[data-role="last-data-time"]');
+    this.telemetrySourceLabel = this.root.querySelector('[data-role="telemetry-source"]');
+    this.root.querySelector('[data-role="clear"]').addEventListener("click", () => this.clearChart());
   }
 
   initChart() {
@@ -58,10 +79,14 @@ export class TelemetryPanel {
     });
   }
 
+  updateTopic(topics) {
+    this.topicLabel.textContent = topics.data;
+  }
+
   handleTelemetry(message) {
     const telemetry = parseTelemetryPayload(message);
     if (!telemetry.values) {
-      this.onWarn?.("telemetry payload missing values/fields object");
+      this.store.appendLog({ timestamp: Date.now(), level: "warn", message: "telemetry payload missing values/fields object" });
       return;
     }
 
@@ -169,6 +194,10 @@ export class TelemetryPanel {
       { replaceMerge: ["xAxis", "legend", "series"] }
     );
     this.updateChartMetrics();
-    this.onToast?.("曲线已清空");
+    this.toast("曲线已清空");
+  }
+
+  resize() {
+    this.chart.resize();
   }
 }

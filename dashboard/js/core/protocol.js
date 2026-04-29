@@ -46,6 +46,25 @@ export function getSubscriptions(topics) {
   };
 }
 
+export function classifyTopic(topic, topics) {
+  if (topic === topics.data) {
+    return "telemetry";
+  }
+  if (topic === topics.log) {
+    return "log";
+  }
+  if (topic === topics.paramsSchema) {
+    return "paramsSchema";
+  }
+  if (topic === topics.paramsCurrent) {
+    return "paramsCurrent";
+  }
+  if (topic === topics.controlAck) {
+    return "ack";
+  }
+  return "unknown";
+}
+
 export function parseTelemetryPayload(message) {
   if (isPlainObject(message?.values)) {
     return { values: message.values, source: "values" };

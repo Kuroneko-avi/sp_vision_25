@@ -116,18 +116,30 @@ Optional debug tools:
 
 ## Frontend Assets
 
-`dashboard/index.html` currently loads `mqtt.js` and ECharts from CDN. If the production network has no external internet access, vendor these assets into `dashboard/vendor/` in a separate task.
+`dashboard/index.html` loads local vendor assets instead of external CDN:
 
-The frontend is split into static files and is served directly by `python3 -m http.server`:
+- `/vendor/mqtt/mqtt.min.js`
+- `/vendor/echarts/echarts.min.js`
+- `/vendor/gridstack/gridstack-all.js`
+- `/vendor/gridstack/gridstack.min.css`
+
+Versions and source URLs are recorded in `dashboard/vendor/README.md`.
+
+The frontend is a lightweight panel workspace served directly by `python3 -m http.server`:
 
 - `/index.html`
 - `/css/dashboard.css`
 - `/js/app.js`
-- `/js/protocol.js`
-- `/js/mqtt_transport.js`
-- `/js/*_panel.js`
+- `/js/core/protocol.js`
+- `/js/core/mqtt_transport.js`
+- `/js/core/store.js`
+- `/js/core/panel_registry.js`
+- `/js/core/layout_manager.js`
+- `/js/panels/*.js`
 
-Frontend visual changes should normally touch `dashboard/index.html` and `dashboard/css/dashboard.css`. MQTT contract logic belongs in `dashboard/js/protocol.js`; UI modules should not hand-build MQTT topics or control payloads. MQTT.js connect, subscribe, publish, reconnect, and message dispatch are isolated in `dashboard/js/mqtt_transport.js`.
+The workspace borrows the Foxglove/rqt idea of a registry-driven panel surface without adopting those platforms. GridStack is the local vendor layout component for draggable and resizable panels.
+
+Frontend visual changes should normally touch `dashboard/css/dashboard.css` and `dashboard/js/panels/*`. MQTT contract logic belongs in `dashboard/js/core/protocol.js` and must stay aligned with `docs/dashboard_mqtt_protocol.md`; panel modules should not hand-build MQTT topics or call MQTT.js directly. MQTT.js connect, subscribe, publish, reconnect, and message dispatch are isolated in `dashboard/js/core/mqtt_transport.js`.
 
 No npm, Vite, React, Vue, or build step is required for the current Dashboard runtime.
 
