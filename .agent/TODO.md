@@ -17,6 +17,7 @@
 - 2026-04-27 MQTT Dashboard 生产收口：Dashboard 网络服务与视觉主程序分离，主程序由人工在真实硬件环境启动。
 - 2026-04-27 MQTT Dashboard 启动参数已收敛到 `configs/standard3.yaml` 的 `dashboard` 配置段，CLI 仍可覆盖。
 - 2026-04-29 MQTT Dashboard PR review 收口：`ThreadSafeQueue` 关闭后会唤醒等待线程，Dashboard CLI/YAML 解析抽到共享 helper，Dashboard 网络服务默认允许局域网访问。
+- 2026-04-29 MQTT Dashboard 静态前端已拆为多文件结构，协议契约集中到 `dashboard/js/protocol.js`，MQTT transport 集中到 `dashboard/js/mqtt_transport.js`，仍不需要 npm build。
 - 当前没有明确进行中的功能任务；本文件现阶段主要承担“维护面板”和“回填入口”的作用。
 - 历史任务细节已归档到下文，不再在顶部重复展开。
 
@@ -60,6 +61,7 @@
 - **2026-04-27**: 完成 Dashboard G/H 合并审查与接口收口，保持不接入 `src/standard_mpc.cpp` 或 `src/auto_aim_debug_mpc.cpp`。
 - **2026-04-27**: 融合 Dashboard 优化前端，并将参数 schema/current 扩展到 `configs/standard3.yaml` 参数目录；复合配置标记为只读、重启生效。
 - **2026-04-29**: 完成 Dashboard PR review 收口：队列关闭语义、CLI helper、LAN 默认暴露、Docker 检查脚本和部署文档已同步。
+- **2026-04-29**: 完成 Dashboard 静态前端解耦：`index.html`、`css/dashboard.css` 与 `js/*.js` 分离，容器改为复制整个 `dashboard/` 目录。
 - **2026-04-26**: 完成 Dashboard 热参数模型 H：新增 `DashboardParams`、Planner/Buff Aimer 热参数快照与单参数 apply，验证范围不包含 TinyMPC Q/R/max_acc 热修改。
 - **2026-04-15**: 将隐藏知识目录更名为 `.agent/`，并同步更新仓库内所有元规则与文档引用路径。
 - **2026-04-15**: 将仓库根 `AGENTS.md` 重写为精简的元规则入口文件，仅保留上下文加载顺序、知识路由与收尾同步要求。

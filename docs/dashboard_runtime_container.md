@@ -118,6 +118,19 @@ Optional debug tools:
 
 `dashboard/index.html` currently loads `mqtt.js` and ECharts from CDN. If the production network has no external internet access, vendor these assets into `dashboard/vendor/` in a separate task.
 
+The frontend is split into static files and is served directly by `python3 -m http.server`:
+
+- `/index.html`
+- `/css/dashboard.css`
+- `/js/app.js`
+- `/js/protocol.js`
+- `/js/mqtt_transport.js`
+- `/js/*_panel.js`
+
+Frontend visual changes should normally touch `dashboard/index.html` and `dashboard/css/dashboard.css`. MQTT contract logic belongs in `dashboard/js/protocol.js`; UI modules should not hand-build MQTT topics or control payloads. MQTT.js connect, subscribe, publish, reconnect, and message dispatch are isolated in `dashboard/js/mqtt_transport.js`.
+
+No npm, Vite, React, Vue, or build step is required for the current Dashboard runtime.
+
 ## Production Boundary
 
 The current runtime has exactly two service shapes:

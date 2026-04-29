@@ -8,7 +8,7 @@ WORKDIR /app
 
 COPY docker/dashboard/mosquitto.conf /etc/mosquitto/mosquitto.conf
 COPY docker/dashboard/entrypoint.sh /usr/local/bin/dashboard-entrypoint
-COPY dashboard/index.html /app/dashboard/index.html
+COPY dashboard/ /app/dashboard/
 
 RUN chmod +x /usr/local/bin/dashboard-entrypoint
 

@@ -5,6 +5,7 @@
 ## 变更摘要
 
 - 新增浏览器 Dashboard：`dashboard/index.html`。
+- Dashboard 前端已拆为静态多文件结构：HTML、CSS 与 ES module JS 分离，仍由容器内静态 HTTP server 直接 serve，不需要 npm build。
 - 新增独立 Dashboard 网络服务容器：`docker-compose.dashboard.yml`、`docker/dashboard/*`。
 - 新增 MQTT 通信层：`tools/mqtt_bridge.*`、`tools/dashboard_mqtt_contract.hpp`。
 - 新增 Dashboard 参数模型：`tools/dashboard_params.*`、`tools/dashboard_config.*`。
@@ -53,6 +54,15 @@ sudo apt install -y mosquitto-clients
 ```
 
 前端当前从 CDN 加载 `mqtt.js` 和 ECharts。若生产网络不能访问外网，需要后续把这两个文件 vendoring 到本地 `dashboard/vendor/`。
+
+前端装修优先修改：
+
+- `dashboard/index.html`：DOM 结构。
+- `dashboard/css/dashboard.css`：视觉样式。
+
+MQTT 契约逻辑集中在 `dashboard/js/protocol.js`，包括 topic、QoS、telemetry 解析、参数 payload 校验和 control payload 构造。UI 文件不要绕过 `protocol.js` 直接拼 topic 或 control payload。MQTT.js 连接、订阅、发布和消息分发集中在 `dashboard/js/mqtt_transport.js`。
+
+当前前端仍是原生静态资源，不引入 Vite、React、Vue 或 npm build。
 
 ## 配置方式
 
