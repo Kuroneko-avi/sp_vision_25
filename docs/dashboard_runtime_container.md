@@ -19,11 +19,24 @@ Equivalent script:
 scripts/dashboard_net_up.sh
 ```
 
-This starts:
+This starts the Dashboard network service with LAN-accessible ports by default:
 
-- native MQTT: `tcp://127.0.0.1:1883`
-- MQTT over WebSocket: `ws://127.0.0.1:9001`
-- Dashboard HTTP: `http://127.0.0.1:8080`
+- native MQTT: `tcp://<host-ip>:1883`
+- MQTT over WebSocket: `ws://<host-ip>:9001`
+- Dashboard HTTP: `http://<host-ip>:8080`
+
+Open the browser at:
+
+```text
+http://主机IP:8080
+```
+
+Use this frontend connection form:
+
+```text
+Broker URL: ws://主机IP:9001
+Robot ID: myrobot
+```
 
 Stop it with:
 
@@ -42,13 +55,13 @@ scripts/dashboard_net_down.sh
 Start the real vision program outside the Dashboard container:
 
 ```bash
-./build/standard_mpc configs/standard3.yaml
+./build/standard_mpc --dashboard configs/standard3.yaml
 ```
 
 or:
 
 ```bash
-./build/auto_aim_debug_mpc configs/standard3.yaml
+./build/auto_aim_debug_mpc --dashboard configs/standard3.yaml
 ```
 
 Dashboard startup is controlled by the YAML `dashboard` block:
@@ -70,12 +83,19 @@ Command line options still override YAML:
 
 Passing `--dashboard` forces Dashboard on even if `dashboard.enabled` is `false`.
 
-If the vision app runs in another Docker container, prefer host networking:
+When the vision app runs on the same host namespace as the Dashboard network service, keep:
 
-- `network_mode: host`
-- vision app connects to `tcp://127.0.0.1:1883`
-- browser opens `http://<host-ip>:8080`
-- Dashboard WebSocket URL is `ws://<host-ip>:9001`
+```text
+tcp://127.0.0.1:1883
+```
+
+If the vision app runs on another machine or in another network namespace, use:
+
+```text
+tcp://主机IP:1883
+```
+
+If a future deployment only wants local access, manually change `docker-compose.dashboard.yml` to bind `127.0.0.1:端口:端口`. The current default intentionally allows LAN access.
 
 ## Extra Dependencies For Dashboard Feature
 
@@ -100,4 +120,9 @@ Optional debug tools:
 
 ## Production Boundary
 
-The production startup path no longer includes video-file runtime, virtual serial runtime, dev build container, or mock publisher entrypoints. Start the real vision app manually in its own environment.
+The current runtime has exactly two service shapes:
+
+- Dashboard network service container.
+- real vision app, started separately in the hardware environment.
+
+The production startup path does not include image/video/MJPEG, Web terminal, mock runtime, video-source, hardwareless smoke, or mock publisher entrypoints. Start the real vision app manually in its own environment.

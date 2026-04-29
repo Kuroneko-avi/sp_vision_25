@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 add_library(tools OBJECT 
+    cli.cpp
     exiter.cpp
     extended_kalman_filter.cpp
     ransac_sine_fitter.cpp

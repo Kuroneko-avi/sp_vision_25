@@ -21,6 +21,7 @@
    - Mosquitto native MQTT：`1883`
    - MQTT over WebSocket：`9001`
    - HTTP Dashboard：`8080`
+   - 默认开放到主机全部网卡，允许局域网访问。
 
 2. 视觉主程序
    - `standard_mpc`
@@ -121,13 +122,13 @@ Robot ID: myrobot
 再启动真实视觉主程序：
 
 ```bash
-./build/standard_mpc configs/standard3.yaml
+./build/standard_mpc --dashboard configs/standard3.yaml
 ```
 
 或：
 
 ```bash
-./build/auto_aim_debug_mpc configs/standard3.yaml
+./build/auto_aim_debug_mpc --dashboard configs/standard3.yaml
 ```
 
 如果 YAML 中 `dashboard.enabled` 保持 `false`，则使用：
@@ -144,23 +145,26 @@ Robot ID: myrobot
 
 ## Docker 网络建议
 
-如果视觉主程序也运行在单独容器中，推荐生产环境使用 host network：
+Dashboard 网络服务容器默认允许局域网访问：
 
-```yaml
-network_mode: host
+```text
+http://主机IP:8080
+ws://主机IP:9001
 ```
 
-此时视觉主程序连接：
+视觉主程序与 Dashboard 网络服务在同一主机网络命名空间时连接：
 
 ```text
 tcp://127.0.0.1:1883
 ```
 
-浏览器访问：
+如果视觉主程序在另一台机器或另一网络命名空间中，连接：
 
 ```text
-http://主机IP:8080
+tcp://主机IP:1883
 ```
+
+如果未来只想本机访问，可以手动把 compose 改为 `127.0.0.1:端口:端口`；当前默认不要这样做。
 
 由于当前不传输图像或视频，只传 telemetry、log、params、control 和 ack，两容器拆分带来的本机 MQTT 传输开销可以忽略。
 
@@ -171,7 +175,7 @@ http://主机IP:8080
 ```bash
 ./scripts/dashboard_net_up.sh
 ./scripts/dashboard_mqtt_check.sh
-curl --noproxy 127.0.0.1 -I http://127.0.0.1:8080
+curl --noproxy "*" -I http://127.0.0.1:8080
 ./scripts/dashboard_net_down.sh
 ```
 

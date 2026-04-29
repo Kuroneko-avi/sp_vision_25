@@ -1,14 +1,23 @@
 # MQTT Dashboard Broker Runbook
 
-本文档用于第一阶段 Dashboard MQTT 地基验证：本机 Mosquitto Broker 监听原生 MQTT `1883`，WebSocket MQTT `9001`，并为后续 C++ HTTP server 预留 `8080`。
+本文档用于 Dashboard MQTT 网络服务验证：Dashboard 容器提供原生 MQTT `1883`、WebSocket MQTT `9001` 和静态 HTTP Dashboard `8080`。
 
 ## 端口规划
 
-| 端口 | 用途 | 阶段一要求 |
+| 端口 | 用途 | 当前要求 |
 | :--- | :--- | :--- |
 | `1883/tcp` | 原生 MQTT | Mosquitto 必须监听 |
 | `9001/tcp` | MQTT over WebSocket | Mosquitto 必须监听 |
-| `8080/tcp` | C++ HTTP server | 仅预留，不由 Mosquitto 占用 |
+| `8080/tcp` | HTTP Dashboard | Python static server 必须监听 |
+
+`docker-compose.dashboard.yml` 默认发布 `1883/9001/8080` 到主机全部网卡，允许局域网内其他主机访问。
+
+- 浏览器访问：`http://主机IP:8080`
+- 前端 Broker URL：`ws://主机IP:9001`
+- 主程序同机连接：`tcp://127.0.0.1:1883`
+- 主程序在另一台机器或另一网络命名空间中连接：`tcp://主机IP:1883`
+
+如果未来只想本机访问，可以手动把 compose 端口改为 `127.0.0.1:端口:端口`，但本次默认不要这样做。
 
 若启用防火墙，需要放行 `1883/tcp`、`9001/tcp`、`8080/tcp`。Ubuntu `ufw` 示例：
 
@@ -19,7 +28,7 @@ sudo ufw allow 8080/tcp
 sudo ufw status
 ```
 
-## Ubuntu/Debian 安装
+## 可选：Ubuntu/Debian 系统级 Mosquitto 安装
 
 ```bash
 sudo apt update
@@ -35,7 +44,7 @@ command -v mosquitto_pub
 command -v mosquitto_sub
 ```
 
-## 推荐 Mosquitto 配置
+## 可选：系统级 Mosquitto 配置
 
 创建 `/etc/mosquitto/conf.d/dashboard.conf`：
 
@@ -65,9 +74,12 @@ bash scripts/dashboard_mqtt_check.sh
 
 检测内容：
 
-- `mosquitto`、`mosquitto_pub`、`mosquitto_sub` 是否存在。
 - `1883`、`9001`、`8080` 的 TCP 监听状态。
-- `/etc/mosquitto/conf.d/dashboard.conf` 是否存在，并包含 `listener 9001` 与 `protocol websockets`。
+- `http://127.0.0.1:8080` 是否响应。
+- `mosquitto`、`mosquitto_pub`、`mosquitto_sub` 是否存在；缺失只输出 WARN。
+- `/etc/mosquitto/conf.d/dashboard.conf` 是否存在；仅作为系统级 Mosquitto 可选检查，缺失不导致失败。
+
+脚本退出码只由 Docker Dashboard 网络服务端口、HTTP 响应或必要检测工具缺失决定；缺少 mosquitto clients 或系统配置文件不会导致失败。
 
 ## 本仓库 smoke test
 
@@ -79,6 +91,6 @@ bash scripts/dashboard_mqtt_smoke.sh
 
 脚本会订阅测试 topic，发布一条 JSON 消息，并校验订阅端收到的内容。`9001` WebSocket MQTT 在第一阶段只检查端口和配置，不在脚本中模拟浏览器 MQTT 客户端。
 
-## 当前环境未验证项
+## 生产边界
 
-截至 2026-04-26，本机未安装或未暴露 `mosquitto`、`mosquitto_pub`、`mosquitto_sub`，也未发现 `/etc/mosquitto/conf.d/dashboard.conf`。因此当前只完成脚本语法和只读检测路径验证，未完成真实 `1883` publish/subscribe 或 `9001` WebSocket 连接验证。
+当前只有两个服务形态：Dashboard 网络服务容器，以及单独启动的真实视觉主程序。不包含 image/video/MJPEG、Web terminal、mock runtime、video-source、hardwareless smoke 或 mock publisher。

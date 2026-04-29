@@ -5,9 +5,11 @@
 #include <condition_variable>
 #include <cstddef>
 #include <functional>
-#include <iostream>
 #include <mutex>
 #include <queue>
+#include <utility>
+
+#include "tools/logger.hpp"
 
 namespace tools {
 template <typename T, bool PopWhenFull = false>
@@ -40,23 +42,19 @@ class ThreadSafeQueue {
     return true;
   }
 
-  void pop(T& value) {
+  bool pop(T& value) {
     std::unique_lock<std::mutex> lock(mutex_);
 
-    not_empty_condition_.wait(lock, [this] { return !queue_.empty(); });
+    not_empty_condition_.wait(lock,
+                              [this] { return closed_ || !queue_.empty(); });
 
-    value = queue_.front();
+    if (queue_.empty()) {
+      return false;
+    }
+
+    value = std::move(queue_.front());
     queue_.pop();
-  }
-
-  T pop() {
-    std::unique_lock<std::mutex> lock(mutex_);
-
-    not_empty_condition_.wait(lock, [this] { return !queue_.empty(); });
-
-    T value = std::move(queue_.front());
-    queue_.pop();
-    return std::move(value);
+    return true;
   }
 
   bool try_pop(T& value) {
@@ -105,20 +103,25 @@ class ThreadSafeQueue {
     return true;
   }
 
-  T front() {
+  bool front(T& value) {
     std::unique_lock<std::mutex> lock(mutex_);
 
-    not_empty_condition_.wait(lock, [this] { return !queue_.empty(); });
+    not_empty_condition_.wait(lock,
+                              [this] { return closed_ || !queue_.empty(); });
 
-    return queue_.front();
+    if (queue_.empty()) {
+      return false;
+    }
+
+    value = queue_.front();
+    return true;
   }
 
   void back(T& value) {
     std::unique_lock<std::mutex> lock(mutex_);
 
     if (queue_.empty()) {
-      std::cerr << "Error: Attempt to access the back of an empty queue."
-                << std::endl;
+      tools::logger()->error("Attempt to access the back of an empty queue.");
       return;
     }
 

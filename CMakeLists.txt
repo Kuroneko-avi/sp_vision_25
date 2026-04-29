@@ -125,7 +125,14 @@ target_link_libraries(dm_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io)
 target_link_libraries(minimum_vision_system ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 target_link_libraries(dashboard_params_test dashboard_params fmt::fmt)
 if(TARGET mqtt_bridge)
-    target_link_libraries(mqtt_bridge_smoke mqtt_bridge nlohmann_json::nlohmann_json)
+    target_link_libraries(mqtt_bridge_smoke
+        mqtt_bridge
+        nlohmann_json::nlohmann_json
+        ${OpenCV_LIBS}
+        fmt::fmt
+        yaml-cpp
+        tools
+    )
 endif()
 
 add_executable(gimbal_test tests/gimbal_test.cpp)

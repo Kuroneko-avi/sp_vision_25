@@ -7,6 +7,14 @@ ok() {
   printf '[OK] %s\n' "$1"
 }
 
+warn() {
+  printf '[WARN] %s\n' "$1"
+}
+
+info() {
+  printf '[INFO] %s\n' "$1"
+}
+
 fail() {
   printf '[FAIL] %s\n' "$1"
   FAIL_COUNT=$((FAIL_COUNT + 1))
@@ -14,6 +22,28 @@ fail() {
 
 has_command() {
   command -v "$1" >/dev/null 2>&1
+}
+
+check_command() {
+  local cmd="$1"
+
+  if has_command "${cmd}"; then
+    ok "${cmd} is available"
+  else
+    warn "missing ${cmd}; optional for Docker Dashboard network check"
+  fi
+}
+
+check_file_contains() {
+  local file="$1"
+  local pattern="$2"
+  local label="$3"
+
+  if grep -q "${pattern}" "${file}"; then
+    ok "${label}"
+  else
+    warn "${label}"
+  fi
 }
 
 is_tcp_listening() {
@@ -55,12 +85,29 @@ check_required_port() {
 
 main() {
   printf '== Dashboard network check ==\n'
+
+  printf 'Checking Docker Dashboard network service ports and HTTP endpoint.\n'
+  check_command mosquitto
+  check_command mosquitto_pub
+  check_command mosquitto_sub
+
+  local dashboard_conf="/etc/mosquitto/conf.d/dashboard.conf"
+  if [[ -f "${dashboard_conf}" ]]; then
+    ok "${dashboard_conf} exists"
+    check_file_contains "${dashboard_conf}" "listener 9001" \
+      "${dashboard_conf} contains 'listener 9001'"
+    check_file_contains "${dashboard_conf}" "protocol websockets" \
+      "${dashboard_conf} contains 'protocol websockets'"
+  else
+    info "${dashboard_conf} not found; skipped optional system Mosquitto config check"
+  fi
+
   check_required_port 1883 "native MQTT"
   check_required_port 9001 "WebSocket MQTT"
   check_required_port 8080 "HTTP Dashboard"
 
   if has_command curl; then
-    if curl -fsSI http://127.0.0.1:8080 >/dev/null; then
+    if curl --noproxy "*" -fsSI http://127.0.0.1:8080 >/dev/null; then
       ok "HTTP Dashboard responds at http://127.0.0.1:8080"
     else
       fail "HTTP Dashboard does not respond at http://127.0.0.1:8080"

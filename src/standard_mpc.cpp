@@ -21,6 +21,7 @@
 #include "tasks/auto_buff/buff_solver.hpp"
 #include "tasks/auto_buff/buff_target.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
+#include "tools/cli.hpp"
 #include "tools/exiter.hpp"
 #include "tools/dashboard_config.hpp"
 #include "tools/img_tools.hpp"
@@ -42,53 +43,6 @@ const std::string keys =
   "{@config-path   | configs/standard3.yaml | yaml配置文件路径 }";
 
 using namespace std::chrono_literals;
-
-std::vector<std::string> normalize_cli_args(int argc, char * argv[])
-{
-  std::vector<std::string> normalized;
-  normalized.reserve(argc);
-  for (int i = 0; i < argc; ++i) {
-    const std::string arg = argv[i];
-    if ((arg == "--robot-id" || arg == "--mqtt-host") && i + 1 < argc) {
-      normalized.push_back(arg + "=" + argv[++i]);
-    } else {
-      normalized.push_back(arg);
-    }
-  }
-  return normalized;
-}
-
-std::vector<char *> make_cli_argv(std::vector<std::string> & args)
-{
-  std::vector<char *> argv;
-  argv.reserve(args.size());
-  for (auto & arg : args) {
-    argv.push_back(arg.data());
-  }
-  return argv;
-}
-
-std::optional<std::string> cli_option_value(
-  const std::vector<std::string> & args, const std::string & option)
-{
-  const auto prefix = option + "=";
-  for (const auto & arg : args) {
-    if (arg.rfind(prefix, 0) == 0) {
-      return arg.substr(prefix.size());
-    }
-  }
-  return std::nullopt;
-}
-
-tools::dashboard::DashboardConfigOverrides make_dashboard_overrides(
-  const std::vector<std::string> & args, bool force_enabled)
-{
-  tools::dashboard::DashboardConfigOverrides overrides;
-  overrides.force_enabled = force_enabled;
-  overrides.robot_id = cli_option_value(args, "--robot-id");
-  overrides.mqtt_host = cli_option_value(args, "--mqtt-host");
-  return overrides;
-}
 
 #ifdef SP_VISION_ENABLE_DASHBOARD_MQTT
 void publish_dashboard_params(
@@ -140,8 +94,8 @@ void handle_dashboard_commands(
 
 int main(int argc, char * argv[])
 {
-  auto normalized_args = normalize_cli_args(argc, argv);
-  auto normalized_argv = make_cli_argv(normalized_args);
+  auto normalized_args = tools::cli::normalize_cli_args(argc, argv);
+  auto normalized_argv = tools::cli::make_cli_argv(normalized_args);
   cv::CommandLineParser cli(
     static_cast<int>(normalized_argv.size()), normalized_argv.data(), keys);
   auto config_path = cli.get<std::string>("@config-path");
@@ -150,7 +104,8 @@ int main(int argc, char * argv[])
     return 0;
   }
   const auto dashboard_config = tools::dashboard::load_dashboard_config(
-    config_path, make_dashboard_overrides(normalized_args, cli.has("dashboard")));
+    config_path,
+    tools::cli::make_dashboard_overrides(normalized_args, cli.has("dashboard")));
 
   tools::Exiter exiter;
   tools::Plotter plotter;
@@ -222,7 +177,10 @@ int main(int argc, char * argv[])
 
     while (!quit) {
       if (!target_queue.empty() && mode == io::GimbalMode::AUTO_AIM) {
-        auto target = target_queue.front();
+        std::optional<auto_aim::Target> target;
+        if (!target_queue.front(target)) {
+          break;
+        }
         auto gs = gimbal.state();
         auto plan = planner.plan(target, gs.bullet_speed);
 

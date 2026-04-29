@@ -1,11 +1,11 @@
 #include <chrono>
 #include <cstdlib>
 #include <exception>
-#include <iostream>
 #include <string>
 #include <thread>
 
 #include "tools/dashboard_mqtt_contract.hpp"
+#include "tools/logger.hpp"
 #include "tools/mqtt_bridge.hpp"
 
 namespace {
@@ -50,7 +50,7 @@ int main() {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     bridge.stop();
   } catch (const std::exception& error) {
-    std::cerr << "mqtt_bridge_smoke failed: " << error.what() << '\n';
+    tools::logger()->error("mqtt_bridge_smoke failed: {}", error.what());
     return 1;
   }
 
