@@ -1,8 +1,6 @@
-#include "tools/cli.hpp"
+#include "tools/dashboard_cli.hpp"
 
-namespace tools
-{
-namespace cli
+namespace tools::dashboard::cli
 {
 
 std::vector<std::string> normalize_cli_args(int argc, char * argv[])
@@ -42,15 +40,14 @@ std::optional<std::string> cli_option_value(
   return std::nullopt;
 }
 
-tools::dashboard::DashboardConfigOverrides make_dashboard_overrides(
+DashboardConfigOverrides make_dashboard_overrides(
   const std::vector<std::string> & args, bool force_enabled)
 {
-  tools::dashboard::DashboardConfigOverrides overrides;
+  DashboardConfigOverrides overrides;
   overrides.force_enabled = force_enabled;
   overrides.robot_id = cli_option_value(args, "--robot-id");
   overrides.mqtt_host = cli_option_value(args, "--mqtt-host");
   return overrides;
 }
 
-}  // namespace cli
-}  // namespace tools
+}  // namespace tools::dashboard::cli

@@ -18,8 +18,8 @@ export class TelemetryPlotPanel {
     this.initChart();
     this.updateTopic(this.store.getState().topics);
     this.updateChartMetrics();
-    this.store.subscribe("connection", ({ topics }) => this.updateTopic(topics));
-    this.store.subscribe("telemetry", (message) => this.handleTelemetry(message));
+    this.store.on("connection", ({ topics }) => this.updateTopic(topics));
+    this.store.on("telemetry", (message) => this.handleTelemetry(message));
   }
 
   renderShell() {

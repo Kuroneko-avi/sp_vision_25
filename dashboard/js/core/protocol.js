@@ -65,6 +65,32 @@ export function classifyTopic(topic, topics) {
   return "unknown";
 }
 
+export function topicForControlKind(topics, kind) {
+  if (kind === "param") {
+    return topics.controlParam;
+  }
+  if (kind === "command") {
+    return topics.controlCmd;
+  }
+  throw new Error(`unsupported control kind: ${kind}`);
+}
+
+export function topicForPanel(topics, panelId) {
+  if (panelId === "telemetry") {
+    return topics.data;
+  }
+  if (panelId === "commands") {
+    return topics.controlCmd;
+  }
+  if (panelId === "ack") {
+    return topics.controlAck;
+  }
+  if (panelId === "params") {
+    return `${topics.paramsSchema} / ${topics.paramsCurrent}`;
+  }
+  return "";
+}
+
 export function parseTelemetryPayload(message) {
   if (isPlainObject(message?.values)) {
     return { values: message.values, source: "values" };

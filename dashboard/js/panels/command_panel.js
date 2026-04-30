@@ -1,4 +1,4 @@
-import { buildControlCmdPayload, QOS } from "../core/protocol.js";
+import { buildControlCmdPayload, QOS, topicForPanel } from "../core/protocol.js";
 
 export class CommandPanel {
   constructor(root, { publishJson, store }) {
@@ -6,7 +6,7 @@ export class CommandPanel {
     this.publishJson = publishJson;
     this.store = store;
     this.renderShell();
-    this.store.subscribe("connection", ({ topics }) => this.updateTopic(topics));
+    this.store.on("connection", ({ topics }) => this.updateTopic(topics));
     this.updateTopic(this.store.getState().topics);
   }
 
@@ -38,7 +38,7 @@ export class CommandPanel {
   }
 
   updateTopic(topics) {
-    this.topicLabel.textContent = topics.controlCmd;
+    this.topicLabel.textContent = topicForPanel(topics, "commands");
   }
 
   setConnectedState(ready) {

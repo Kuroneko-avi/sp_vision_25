@@ -6,7 +6,7 @@ export class RawMqttPanel {
     this.store = store;
     this.toast = toast;
     this.renderShell();
-    this.store.subscribe("rawMessages", (messages) => this.renderMessages(messages));
+    this.store.on("rawMessages", (messages) => this.renderMessages(messages));
     this.renderMessages(this.store.getState().rawMessages);
   }
 

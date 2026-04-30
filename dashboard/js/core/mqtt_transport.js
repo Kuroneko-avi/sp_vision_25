@@ -42,28 +42,53 @@ export class MqttTransport {
       return;
     }
 
-    this.client.on("connect", () => this.subscribeAll());
-    this.client.on("reconnect", () => this.callbacks.onStatus?.("reconnecting"));
-    this.client.on("offline", () => this.callbacks.onStatus?.("offline"));
-    this.client.on("close", () => {
-      if (this.client) {
+    const activeClient = this.client;
+    const isCurrentClient = () => this.client === activeClient;
+
+    activeClient.on("connect", () => {
+      if (isCurrentClient()) {
+        this.subscribeAll(activeClient);
+      }
+    });
+    activeClient.on("reconnect", () => {
+      if (isCurrentClient()) {
+        this.callbacks.onStatus?.("reconnecting");
+      }
+    });
+    activeClient.on("offline", () => {
+      if (isCurrentClient()) {
+        this.callbacks.onStatus?.("offline");
+      }
+    });
+    activeClient.on("close", () => {
+      if (isCurrentClient()) {
         this.callbacks.onStatus?.("closed");
       }
     });
-    this.client.on("error", (error) => {
-      this.callbacks.onStatus?.("error");
-      this.callbacks.onError?.(error);
+    activeClient.on("error", (error) => {
+      if (isCurrentClient()) {
+        this.callbacks.onStatus?.("error");
+        this.callbacks.onError?.(error);
+      }
     });
-    this.client.on("message", (topic, payload) => this.dispatchMessage(topic, payload));
+    activeClient.on("message", (topic, payload) => {
+      if (isCurrentClient()) {
+        this.dispatchMessage(topic, payload);
+      }
+    });
   }
 
-  subscribeAll() {
-    this.callbacks.onStatus?.("online");
-    this.client.subscribe(getSubscriptions(this.topics), (error) => {
+  subscribeAll(activeClient = this.client) {
+    activeClient.subscribe(getSubscriptions(this.topics), (error) => {
+      if (this.client !== activeClient) {
+        return;
+      }
       if (error) {
+        this.callbacks.onStatus?.("error");
         this.callbacks.onError?.(error, "subscribe");
         return;
       }
+      this.callbacks.onStatus?.("online");
       this.callbacks.onSubscribed?.();
     });
   }
@@ -74,6 +99,7 @@ export class MqttTransport {
     }
     const oldClient = this.client;
     this.client = null;
+    oldClient.removeAllListeners();
     oldClient.end(true);
     if (!options.silent) {
       this.callbacks.onStatus?.("offline");

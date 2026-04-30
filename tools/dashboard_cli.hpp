@@ -1,5 +1,5 @@
-#ifndef TOOLS__CLI_HPP
-#define TOOLS__CLI_HPP
+#ifndef TOOLS__DASHBOARD_CLI_HPP
+#define TOOLS__DASHBOARD_CLI_HPP
 
 #include <optional>
 #include <string>
@@ -7,9 +7,7 @@
 
 #include "tools/dashboard_config.hpp"
 
-namespace tools
-{
-namespace cli
+namespace tools::dashboard::cli
 {
 
 std::vector<std::string> normalize_cli_args(int argc, char * argv[]);
@@ -19,10 +17,9 @@ std::vector<char *> make_cli_argv(std::vector<std::string> & args);
 std::optional<std::string> cli_option_value(
   const std::vector<std::string> & args, const std::string & option);
 
-tools::dashboard::DashboardConfigOverrides make_dashboard_overrides(
+DashboardConfigOverrides make_dashboard_overrides(
   const std::vector<std::string> & args, bool force_enabled);
 
-}  // namespace cli
-}  // namespace tools
+}  // namespace tools::dashboard::cli
 
-#endif  // TOOLS__CLI_HPP
+#endif  // TOOLS__DASHBOARD_CLI_HPP

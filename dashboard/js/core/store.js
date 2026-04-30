@@ -24,7 +24,7 @@ export class DashboardStore {
     return this.state;
   }
 
-  subscribe(event, listener) {
+  on(event, listener) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }

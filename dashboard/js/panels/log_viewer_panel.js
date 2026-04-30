@@ -7,7 +7,7 @@ export class LogViewerPanel {
     this.toast = toast;
     this.logScrollPaused = false;
     this.renderShell();
-    this.store.subscribe("logs", (logs) => this.renderLogs(logs));
+    this.store.on("logs", (logs) => this.renderLogs(logs));
     this.renderLogs(this.store.getState().logs);
   }
 

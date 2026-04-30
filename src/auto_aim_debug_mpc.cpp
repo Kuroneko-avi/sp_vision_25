@@ -17,7 +17,7 @@
 #include "tasks/auto_aim/solver.hpp"
 #include "tasks/auto_aim/tracker.hpp"
 #include "tasks/auto_aim/yolo.hpp"
-#include "tools/cli.hpp"
+#include "tools/dashboard_cli.hpp"
 #include "tools/dashboard_config.hpp"
 #include "tools/exiter.hpp"
 #include "tools/img_tools.hpp"
@@ -93,8 +93,8 @@ int main(int argc, char * argv[])
   tools::Exiter exiter;
   tools::Plotter plotter;
 
-  auto normalized_args = tools::cli::normalize_cli_args(argc, argv);
-  auto normalized_argv = tools::cli::make_cli_argv(normalized_args);
+  auto normalized_args = tools::dashboard::cli::normalize_cli_args(argc, argv);
+  auto normalized_argv = tools::dashboard::cli::make_cli_argv(normalized_args);
   cv::CommandLineParser cli(
     static_cast<int>(normalized_argv.size()), normalized_argv.data(), keys);
   auto config_path = cli.get<std::string>(0);
@@ -104,7 +104,7 @@ int main(int argc, char * argv[])
   }
   const auto dashboard_config = tools::dashboard::load_dashboard_config(
     config_path,
-    tools::cli::make_dashboard_overrides(normalized_args, cli.has("dashboard")));
+    tools::dashboard::cli::make_dashboard_overrides(normalized_args, cli.has("dashboard")));
 
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);

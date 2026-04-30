@@ -39,7 +39,10 @@ target_link_libraries(dashboard_params
         tools
 )
 
-add_library(dashboard_config STATIC tools/dashboard_config.cpp)
+add_library(dashboard_config STATIC
+    tools/dashboard_config.cpp
+    tools/dashboard_cli.cpp
+)
 target_link_libraries(dashboard_config
     PUBLIC
         yaml-cpp

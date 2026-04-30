@@ -15,9 +15,9 @@ export class ParamsEditorPanel {
     this.pendingParamRequests = new Map();
     this.ready = false;
     this.renderShell();
-    this.store.subscribe("connection", ({ topics }) => this.updateTopic(topics));
-    this.store.subscribe("paramsSchema", (params) => this.applyParamSchema(params));
-    this.store.subscribe("paramsCurrent", (values) => this.handleParamCurrentValues(values));
+    this.store.on("connection", ({ topics }) => this.updateTopic(topics));
+    this.store.on("paramsSchema", (params) => this.applyParamSchema(params));
+    this.store.on("paramsCurrent", (values) => this.handleParamCurrentValues(values));
     this.updateTopic(this.store.getState().topics);
     window.addEventListener("beforeunload", (event) => {
       if (!this.dirtyParams.size) {
@@ -325,17 +325,21 @@ export class ParamsEditorPanel {
       return [textarea];
     }
     if (entry.type === "number") {
+      const number = document.createElement("input");
+      number.type = "number";
+      this.applyNumberBounds(number, entry);
+      number.value = this.numberOrDefault(entry.value, "");
+      number.disabled = !editable;
+      number.readOnly = !editable;
+      if (!editable) {
+        return [number];
+      }
+
       const range = document.createElement("input");
       range.type = "range";
       this.applyNumberBounds(range, entry);
       range.value = this.numberOrDefault(entry.value, range.min || 0);
-      range.disabled = !editable;
-      const number = document.createElement("input");
-      number.type = "number";
-      this.applyNumberBounds(number, entry);
       number.value = range.value;
-      number.disabled = !editable;
-      number.readOnly = !editable;
       range.addEventListener("input", () => {
         number.value = range.value;
       });
@@ -494,7 +498,9 @@ export class ParamsEditorPanel {
 
   readParamValue(control) {
     if (control.entry.type === "number") {
-      return Number(control.controls[1].value);
+      const numberControl = control.controls.length > 1 ? control.controls[1] : control.controls[0];
+      const rawValue = String(numberControl.value ?? "").trim();
+      return rawValue === "" ? Number.NaN : Number(rawValue);
     }
     if (control.entry.type === "bool") {
       return control.controls[0].querySelector("input").checked;

@@ -6,8 +6,8 @@ export class AckPanel {
     this.store = store;
     this.toast = toast;
     this.renderShell();
-    this.store.subscribe("connection", ({ topics }) => this.updateTopic(topics));
-    this.store.subscribe("acks", (acks) => this.renderAcks(acks));
+    this.store.on("connection", ({ topics }) => this.updateTopic(topics));
+    this.store.on("acks", (acks) => this.renderAcks(acks));
     this.updateTopic(this.store.getState().topics);
     this.renderAcks(this.store.getState().acks);
   }

@@ -21,8 +21,8 @@
 #include "tasks/auto_buff/buff_solver.hpp"
 #include "tasks/auto_buff/buff_target.hpp"
 #include "tasks/auto_buff/buff_type.hpp"
-#include "tools/cli.hpp"
 #include "tools/exiter.hpp"
+#include "tools/dashboard_cli.hpp"
 #include "tools/dashboard_config.hpp"
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
@@ -94,8 +94,8 @@ void handle_dashboard_commands(
 
 int main(int argc, char * argv[])
 {
-  auto normalized_args = tools::cli::normalize_cli_args(argc, argv);
-  auto normalized_argv = tools::cli::make_cli_argv(normalized_args);
+  auto normalized_args = tools::dashboard::cli::normalize_cli_args(argc, argv);
+  auto normalized_argv = tools::dashboard::cli::make_cli_argv(normalized_args);
   cv::CommandLineParser cli(
     static_cast<int>(normalized_argv.size()), normalized_argv.data(), keys);
   auto config_path = cli.get<std::string>("@config-path");
@@ -105,7 +105,7 @@ int main(int argc, char * argv[])
   }
   const auto dashboard_config = tools::dashboard::load_dashboard_config(
     config_path,
-    tools::cli::make_dashboard_overrides(normalized_args, cli.has("dashboard")));
+    tools::dashboard::cli::make_dashboard_overrides(normalized_args, cli.has("dashboard")));
 
   tools::Exiter exiter;
   tools::Plotter plotter;

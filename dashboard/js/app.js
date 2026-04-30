@@ -1,4 +1,12 @@
-import { buildTopics, DEFAULT_ROBOT_ID, parseTelemetryPayload, sanitizeRobotId, validateParamsCurrent, validateParamsSchema } from "./core/protocol.js";
+import {
+  buildTopics,
+  DEFAULT_ROBOT_ID,
+  parseTelemetryPayload,
+  sanitizeRobotId,
+  topicForControlKind,
+  validateParamsCurrent,
+  validateParamsSchema
+} from "./core/protocol.js";
 import { DashboardStore } from "./core/store.js";
 import { LayoutManager } from "./core/layout_manager.js";
 import { MqttTransport } from "./core/mqtt_transport.js";
@@ -65,11 +73,7 @@ ui.robotIdInput.addEventListener("keydown", submitConnectionOnEnter);
 syncControls();
 
 function publishJson(kind, payload, qos, onSuccess, onError) {
-  const topicByKind = {
-    param: topics.controlParam,
-    command: topics.controlCmd
-  };
-  transport.publishJson(topicByKind[kind], payload, qos, onSuccess, onError);
+  transport.publishJson(topicForControlKind(topics, kind), payload, qos, onSuccess, onError);
 }
 
 function dispatchMessage(kind, message) {
