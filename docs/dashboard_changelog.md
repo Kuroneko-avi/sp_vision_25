@@ -1,36 +1,37 @@
 # MQTT Dashboard Changelog And Usage
 
-本文面向合并评审和后续使用者，说明本分支新增的 MQTT Dashboard 功能、依赖、启动方式和生产边界。
+本文面向合并评审和后续使用者，说明本分支在视觉仓库中保留的 MQTT Dashboard 后端能力和生产边界。
 
 ## 变更摘要
 
-- 新增浏览器 Dashboard：`dashboard/index.html`。
-- Dashboard 前端已从静态多文件升级为轻量 panel 工作台：使用 GridStack 管理可拖拽、可缩放 panel，仍由容器内静态 HTTP server 直接 serve，不需要 npm build。
-- 新增独立 Dashboard 网络服务容器：`docker-compose.dashboard.yml`、`docker/dashboard/*`。
-- 新增 MQTT 通信层：`tools/mqtt_bridge.*`、`tools/dashboard_mqtt_contract.hpp`。
-- 新增 Dashboard 参数模型：`tools/dashboard_params.*`、`tools/dashboard_config.*`。
-- Dashboard 当前只接入 `auto_aim_debug_mpc`：通过 MQTT 发布 telemetry、log、params/schema、params/current，并消费 control/param、control/cmd。`standard_mpc` 保持 upstream/main 行为，不链接 Dashboard 目标。
-- `configs/standard3.yaml` 新增 `dashboard` 配置段。
+- 保留 MQTT 通信层：`tools/mqtt_bridge.*`、`tools/dashboard_mqtt_contract.hpp`。
+- 保留 Dashboard 参数模型与配置解析：`tools/dashboard_params.*`、`tools/dashboard_config.*`、`tools/dashboard_cli.*`。
+- Dashboard 当前只接入 `auto_aim_debug_mpc`：发布 telemetry、log、params/schema、params/current，并消费 control/param、control/cmd。
+- `standard_mpc` 保持 upstream/main 行为，不链接 Dashboard 目标。
+- `configs/standard3.yaml` 保留 `dashboard` 配置段。
+- 浏览器 UI、样式、前端脚本、前端第三方依赖和静态服务容器已从视觉仓库拆出，迁移到独立 Dashboard panel 仓库。
 
 本功能不包含图像流、视频流、MJPEG 或 Web terminal。
 
-## 生产部署形态
+## 当前仓库职责
 
-生产环境拆成两个独立服务：
+`sp_vision_25` 只负责：
 
-1. Dashboard 网络服务容器
-   - Mosquitto native MQTT：`1883`
-   - MQTT over WebSocket：`9001`
-   - HTTP Dashboard：`8080`
-   - 默认开放到主机全部网卡，允许局域网访问。
+- MQTT topic 与 JSON payload 契约。
+- C++ MQTT bridge。
+- 参数 schema/current 生成。
+- `auto_aim_debug_mpc` 的 Dashboard 可选接入。
+- 控制消息入队，并由主循环安全点消费。
 
-2. 视觉主程序
-   - `auto_aim_debug_mpc`
-   - 在真实硬件环境中单独启动，通过 MQTT native `1883` 连接 Dashboard 网络服务。
+`sp_vision_25` 不负责：
 
-两者只通过 MQTT 通信。Dashboard 容器不启动视觉主程序，也不启动 mock publisher。
+- 浏览器页面。
+- 样式或前端脚本。
+- 前端依赖 vendor。
+- Mosquitto 或 WebSocket MQTT 服务进程。
+- HTTP 静态资源服务。
 
-## 新增依赖
+## 依赖
 
 `auto_aim_debug_mpc` 构建或运行 Dashboard MQTT 功能需要：
 
@@ -41,44 +42,11 @@ sudo apt install -y libpaho-mqtt-dev libpaho-mqttpp-dev nlohmann-json3-dev
 
 如果基础镜像已经提供 `nlohmann/json.hpp`，则 `nlohmann-json3-dev` 不是额外依赖。
 
-Dashboard 网络服务容器内部依赖：
-
-- `mosquitto`
-- `python3`，用于 `python3 -m http.server` 提供静态 HTTP 服务。
-
-可选调试工具：
-
-```bash
-sudo apt install -y mosquitto-clients
-```
-
-前端依赖已 vendor 到本地 `dashboard/vendor/`：
-
-- `mqtt.js`：`dashboard/vendor/mqtt/mqtt.min.js`
-- ECharts：`dashboard/vendor/echarts/echarts.min.js`
-- GridStack：`dashboard/vendor/gridstack/gridstack-all.js`、`dashboard/vendor/gridstack/gridstack.min.css`
-
-版本和来源记录在 `dashboard/vendor/README.md`。当前前端不再依赖外部 CDN。
-
-前端装修优先修改：
-
-- `dashboard/css/dashboard.css`：视觉样式。
-- `dashboard/js/panels/*`：具体 panel 内容和交互。
-
-当前借鉴 Foxglove/rqt 的 panel registry 思路，核心结构为：
-
-- `dashboard/js/core/panel_registry.js`：注册 panel id、标题、默认尺寸和 mount 方法。
-- `dashboard/js/core/layout_manager.js`：初始化 GridStack 并挂载 panel 容器。
-- `dashboard/js/core/store.js`：保存连接状态、最新 telemetry、params、ack、log 和 Raw MQTT 消息。
-- `dashboard/js/panels/*`：telemetry、params、commands、ack、logs、Raw MQTT 等独立面板。
-
-MQTT 契约逻辑集中在 `dashboard/js/core/protocol.js`，包括 topic、QoS、telemetry 解析、参数 payload 校验和 control payload 构造。Panel 文件不要绕过 `protocol.js` 直接拼 topic 或 control payload。MQTT.js 连接、订阅、发布和消息分发集中在 `dashboard/js/core/mqtt_transport.js`。
-
-当前前端仍是原生静态资源，不引入 Vite、React、Vue 或 npm build。
+Dashboard 服务依赖由独立前端仓库管理。
 
 ## 配置方式
 
-`configs/standard3.yaml` 新增：
+`configs/standard3.yaml` 中的配置段：
 
 ```yaml
 dashboard:
@@ -89,7 +57,7 @@ dashboard:
 
 默认 `enabled: false`，目的是合入 main 后不改变原有主程序启动行为。
 
-`auto_aim_debug_mpc` 的生产启用方式二选一：
+启用方式二选一：
 
 1. 修改部署用 YAML：
 
@@ -116,29 +84,22 @@ CLI 优先级高于 YAML：
 
 ## 启动方式
 
-先启动 Dashboard 网络服务：
+先在独立 Dashboard panel 仓库启动服务：
 
 ```bash
-./scripts/dashboard_net_up.sh
+docker compose up -d
 ```
 
-等价命令：
-
-```bash
-docker compose -f docker-compose.dashboard.yml up -d --build
-```
-
-浏览器访问：
+同机部署时，浏览器访问：
 
 ```text
-http://主机IP:8080
+http://机器人IP:8080
 ```
 
-前端填写：
+浏览器 MQTT WebSocket：
 
 ```text
-Broker URL: ws://主机IP:9001
-Robot ID: myrobot
+ws://机器人IP:9001
 ```
 
 再启动真实 Dashboard 视觉入口：
@@ -147,26 +108,13 @@ Robot ID: myrobot
 ./build/auto_aim_debug_mpc --dashboard --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
 ```
 
-如果 Dashboard 网络服务在另一台电脑上，视觉程序使用对端 LAN IP：
+如果 Dashboard 服务在调试电脑上，机器人视觉程序使用对端 LAN IP：
 
 ```bash
-./build/auto_aim_debug_mpc --dashboard --mqtt-host tcp://Dashboard主机IP:1883 configs/standard3.yaml
+./build/auto_aim_debug_mpc --dashboard --mqtt-host tcp://调试电脑IP:1883 configs/standard3.yaml
 ```
 
-停止 Dashboard 网络服务：
-
-```bash
-./scripts/dashboard_net_down.sh
-```
-
-## Docker 网络建议
-
-Dashboard 网络服务容器默认允许局域网访问：
-
-```text
-http://主机IP:8080
-ws://主机IP:9001
-```
+## 网络说明
 
 拓扑 A：Dashboard 服务和视觉程序在同一台机器人/主机上。
 
@@ -176,32 +124,19 @@ auto_aim_debug_mpc -> tcp://127.0.0.1:1883
 浏览器 MQTT WS -> ws://机器人IP:9001
 ```
 
-这里 C++ 用 `127.0.0.1` 是合理的，因为 broker 与视觉程序在同一网络命名空间；浏览器仍通过网线或 LAN 访问机器人 IP 获取 UI/CSS/JS。
+这里 C++ 用 `127.0.0.1` 是合理的，因为 broker 与视觉程序在同一网络命名空间；电脑浏览器不能访问自己的 `127.0.0.1:8080`，应访问机器人 IP。
 
-拓扑 B：Dashboard 服务在另一台电脑上，视觉程序在机器人上。
+拓扑 B：Dashboard 服务在调试电脑上，视觉程序在机器人上。
 
 ```text
-auto_aim_debug_mpc -> tcp://Dashboard电脑IP:1883
-浏览器设备 -> http://Dashboard电脑IP:8080
-浏览器 MQTT WS -> ws://Dashboard电脑IP:9001
+auto_aim_debug_mpc -> tcp://调试电脑IP:1883
+浏览器设备 -> http://调试电脑IP:8080
+浏览器 MQTT WS -> ws://调试电脑IP:9001
 ```
 
 `127.0.0.1` 不是唯一生产写法；如果 broker 不在视觉程序同一网络命名空间，`--mqtt-host` 必须使用对端 LAN IP。
 
-如果未来只想本机访问，可以手动把 compose 改为 `127.0.0.1:端口:端口`；当前默认不要这样做。
-
-由于当前不传输图像或视频，只传 telemetry、log、params、control 和 ack，两容器拆分带来的本机 MQTT 传输开销可以忽略。
-
 ## 手动验收
-
-检查 Dashboard 网络服务：
-
-```bash
-./scripts/dashboard_net_up.sh
-./scripts/dashboard_mqtt_check.sh
-curl --noproxy "*" -I http://127.0.0.1:8080
-./scripts/dashboard_net_down.sh
-```
 
 有真实硬件和完整依赖时，构建并启动：
 
@@ -209,16 +144,10 @@ curl --noproxy "*" -I http://127.0.0.1:8080
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target auto_aim_debug_mpc dashboard_params_test -j$(nproc)
 cmake --build build --target standard_mpc -j$(nproc)
-./scripts/dashboard_net_up.sh
 ./build/auto_aim_debug_mpc --dashboard --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
 ```
 
-浏览器中确认：
-
-- telemetry 曲线持续更新。
-- params/schema 与 params/current 可见。
-- 可发送 `stop_dashboard`、`start_dashboard`、`republish_params`。
-- control/ack 正常返回。
+浏览器侧验收在独立 Dashboard panel 仓库执行。
 
 ## 合并注意事项
 

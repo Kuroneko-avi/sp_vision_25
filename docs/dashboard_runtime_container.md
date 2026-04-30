@@ -1,64 +1,29 @@
-# Dashboard Production Runtime
+# Dashboard Runtime Boundary
 
-Dashboard production runtime is split into two independent services:
+本仓库只保留视觉程序侧的 MQTT Dashboard 后端能力，不再承载浏览器 UI、静态 HTTP 服务或前端容器。
 
-- `dashboard-net`: Mosquitto native MQTT, MQTT over WebSocket, and static HTTP Dashboard.
-- vision app: `auto_aim_debug_mpc`, started separately with real camera, gimbal, CAN, model, and config dependencies.
+## Repository Split
 
-The two sides communicate only through MQTT topics.
+- `sp_vision_25`: 视觉代码仓库，负责 MQTT topic、payload、C++ bridge、参数 schema/current 和控制消息消费。
+- 独立 Dashboard panel 仓库：负责浏览器页面、样式、前端脚本、第三方前端依赖、Mosquitto、WebSocket MQTT 和 HTTP 静态服务。
 
-## Start Dashboard Network
+两边只通过 `docs/dashboard_mqtt_protocol.md` 定义的 MQTT 契约通信。
 
-```bash
-docker compose -f docker-compose.dashboard.yml up -d --build
-```
+## Vision App
 
-Equivalent script:
+Dashboard 当前只接入 `auto_aim_debug_mpc`。`standard_mpc` 保持 upstream/main 行为，不作为 Dashboard 入口。
 
 ```bash
-scripts/dashboard_net_up.sh
+./build/auto_aim_debug_mpc --dashboard configs/standard3.yaml
 ```
 
-This starts the Dashboard network service with LAN-accessible ports by default:
-
-- native MQTT: `tcp://<host-ip>:1883`
-- MQTT over WebSocket: `ws://<host-ip>:9001`
-- Dashboard HTTP: `http://<host-ip>:8080`
-
-Open the browser at:
-
-```text
-http://主机IP:8080
-```
-
-Use this frontend connection form:
-
-```text
-Broker URL: ws://主机IP:9001
-Robot ID: myrobot
-```
-
-Stop it with:
-
-```bash
-docker compose -f docker-compose.dashboard.yml down
-```
-
-Equivalent script:
-
-```bash
-scripts/dashboard_net_down.sh
-```
-
-## Start Vision App
-
-Start the real Dashboard-enabled vision program outside the Dashboard container:
+也可以显式覆盖 broker 地址：
 
 ```bash
 ./build/auto_aim_debug_mpc --dashboard --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
 ```
 
-Dashboard startup is controlled by the YAML `dashboard` block:
+YAML 配置段：
 
 ```yaml
 dashboard:
@@ -67,89 +32,55 @@ dashboard:
   mqtt_host: "tcp://127.0.0.1:1883"
 ```
 
-The merged main baseline keeps `enabled: false` by default so existing robot startup behavior does not change. For production Dashboard use, either change it to `true` in the deployed config or pass `--dashboard` to `auto_aim_debug_mpc`.
+部署时也可以改为：
 
-Command line options still override YAML:
-
-```bash
-./build/auto_aim_debug_mpc --dashboard --robot-id hero --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
+```yaml
+dashboard:
+  enabled: true
+  robot_id: "myrobot"
+  mqtt_host: "tcp://127.0.0.1:1883"
 ```
 
-Passing `--dashboard` forces Dashboard on even if `dashboard.enabled` is `false`.
+CLI 覆盖优先级高于 YAML。MQTT 初始化或连接失败时，视觉程序记录 warning，并降级关闭 Dashboard telemetry，不直接退出主视觉业务。
 
-Topology A: Dashboard service and the vision app run on the same robot or host.
+## Network Topologies
+
+拓扑 A：Dashboard 服务和视觉程序在同一台机器人或主机上。
 
 ```text
 auto_aim_debug_mpc -> tcp://127.0.0.1:1883
-browser device -> http://机器人IP:8080
-browser MQTT WS -> ws://机器人IP:9001
+browser device -> http://robot-lan-ip:8080
+browser MQTT WS -> ws://robot-lan-ip:9001
 ```
 
-In this topology, `127.0.0.1` is correct for the C++ process because the MQTT broker is in the same host network namespace. The browser still uses the robot LAN IP over the cable or local network to fetch HTML/CSS/JS and connect to MQTT over WebSocket.
+这里 C++ 用 `127.0.0.1` 是合理的，因为 broker 在视觉程序同一主机网络命名空间。电脑或平板浏览器不能访问自己的 `127.0.0.1:8080`，必须访问机器人 LAN IP。
 
-Topology B: Dashboard service runs on another computer, while the vision app runs on the robot.
+拓扑 B：Dashboard 服务在调试电脑上，视觉程序在机器人上。
 
 ```text
-auto_aim_debug_mpc -> tcp://Dashboard电脑IP:1883
-browser device -> http://Dashboard电脑IP:8080
-browser MQTT WS -> ws://Dashboard电脑IP:9001
+auto_aim_debug_mpc -> tcp://debug-pc-lan-ip:1883
+browser device -> http://debug-pc-lan-ip:8080
+browser MQTT WS -> ws://debug-pc-lan-ip:9001
 ```
 
-`127.0.0.1` is not the only production address. If the broker is not in the same network namespace as `auto_aim_debug_mpc`, use the Dashboard host LAN IP for `--mqtt-host`.
+如果 broker 不在视觉程序同一网络命名空间，`dashboard.mqtt_host` 或 `--mqtt-host` 必须使用 Dashboard 主机 LAN IP。
 
-If a future deployment only wants local access, manually change `docker-compose.dashboard.yml` to bind `127.0.0.1:端口:端口`. The current default intentionally allows LAN access.
+## Frontend Runtime
 
-## Extra Dependencies For Dashboard Feature
+Dashboard 服务由独立前端仓库启动：
 
-Dashboard-enabled `auto_aim_debug_mpc` build/runtime needs:
+```bash
+docker compose up -d
+```
 
-- `libpaho-mqtt-dev`
-- `libpaho-mqttpp-dev`
-- `nlohmann-json3-dev`, unless the image already provides `nlohmann/json.hpp`
+该仓库应提供：
 
-`dashboard-net` container needs:
+- Mosquitto native MQTT: `1883`
+- MQTT over WebSocket: `9001`
+- HTTP static Dashboard: `8080`
 
-- `mosquitto`
-- static HTTP server; current image uses `python3 -m http.server`
-
-Optional debug tools:
-
-- `mosquitto-clients`
-
-## Frontend Assets
-
-`dashboard/index.html` loads local vendor assets instead of external CDN:
-
-- `/vendor/mqtt/mqtt.min.js`
-- `/vendor/echarts/echarts.min.js`
-- `/vendor/gridstack/gridstack-all.js`
-- `/vendor/gridstack/gridstack.min.css`
-
-Versions and source URLs are recorded in `dashboard/vendor/README.md`.
-
-The frontend is a lightweight panel workspace served directly by `python3 -m http.server`:
-
-- `/index.html`
-- `/css/dashboard.css`
-- `/js/app.js`
-- `/js/core/protocol.js`
-- `/js/core/mqtt_transport.js`
-- `/js/core/store.js`
-- `/js/core/panel_registry.js`
-- `/js/core/layout_manager.js`
-- `/js/panels/*.js`
-
-The workspace borrows the Foxglove/rqt idea of a registry-driven panel surface without adopting those platforms. GridStack is the local vendor layout component for draggable and resizable panels.
-
-Frontend visual changes should normally touch `dashboard/css/dashboard.css` and `dashboard/js/panels/*`. MQTT contract logic belongs in `dashboard/js/core/protocol.js` and must stay aligned with `docs/dashboard_mqtt_protocol.md`; panel modules should not hand-build MQTT topics or call MQTT.js directly. MQTT.js connect, subscribe, publish, reconnect, and message dispatch are isolated in `dashboard/js/core/mqtt_transport.js`.
-
-No npm, Vite, React, Vue, or build step is required for the current Dashboard runtime.
+`sp_vision_25` 中的 C++ 代码不提供 HTML、CSS、JS 或 HTTP static server。
 
 ## Production Boundary
 
-The current runtime has exactly two service shapes:
-
-- Dashboard network service container.
-- real `auto_aim_debug_mpc`, started separately in the hardware environment.
-
-The production startup path does not include image/video/MJPEG, Web terminal, mock runtime, video-source, hardwareless smoke, or mock publisher entrypoints. The vision program is only an MQTT native client on `1883`; it does not serve HTML, CSS, JS, or any HTTP endpoint. `standard_mpc` remains the normal non-Dashboard business entry.
+本仓库不包含 image/video/MJPEG、Web terminal、mock runtime、video-source、hardwareless smoke 或 mock publisher。视觉程序只作为 MQTT client 使用 native `1883` 与 Dashboard 服务通信。

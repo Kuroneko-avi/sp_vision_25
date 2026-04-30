@@ -1,6 +1,6 @@
 # Dashboard Build Notes
 
-This document records the production Dashboard MQTT build boundary. The Dashboard network container and the vision app are separate processes connected by MQTT.
+This document records the Dashboard MQTT backend boundary that remains in the vision repository.
 
 ## CMake Integration
 
@@ -10,11 +10,10 @@ The root `CMakeLists.txt` includes `cmake/DashboardDeps.cmake`.
 - If Paho MQTT C++ is missing, normal non-dashboard vision targets still configure without the dashboard MQTT path.
 - When `mqtt_bridge` exists, only `auto_aim_debug_mpc` links `mqtt_bridge` and `dashboard_params`, and only `auto_aim_debug_mpc` defines `SP_VISION_ENABLE_DASHBOARD_MQTT`.
 - `standard_mpc` remains upstream behavior.
-- The Dashboard-only libraries stay on `auto_aim_debug_mpc`.
 
 ## Vision App Dependencies Added By Dashboard
 
-Install these only for the dashboard MQTT feature:
+Install these only for the Dashboard MQTT backend feature:
 
 ```bash
 sudo apt update
@@ -23,22 +22,9 @@ sudo apt install -y libpaho-mqtt-dev libpaho-mqttpp-dev nlohmann-json3-dev
 
 If the image already provides `nlohmann/json.hpp`, `nlohmann-json3-dev` is not an additional requirement.
 
-## Dashboard Network Container Dependencies
-
-`dashboard-net` only needs:
-
-- Mosquitto for native MQTT and MQTT over WebSocket.
-- A static HTTP server; current image uses `python3 -m http.server`.
-
-Optional host-side debug tool:
-
-```bash
-sudo apt install -y mosquitto-clients
-```
-
 ## Runtime Boundary
 
-`dashboard-net` publishes no application telemetry and starts no vision program. Start `auto_aim_debug_mpc` manually with real hardware access when Dashboard is needed. Dashboard settings are read from `configs/standard3.yaml`:
+Start `auto_aim_debug_mpc` manually with real hardware access when Dashboard is needed. Dashboard settings are read from `configs/standard3.yaml`:
 
 ```yaml
 dashboard:
@@ -46,8 +32,6 @@ dashboard:
   robot_id: "myrobot"
   mqtt_host: "tcp://127.0.0.1:1883"
 ```
-
-The merged main baseline keeps `enabled: false` by default so existing robot startup behavior does not change. For production Dashboard use, either change it to `true` in the deployed config or pass `--dashboard` to `auto_aim_debug_mpc`.
 
 Default startup without Dashboard remains unchanged:
 
@@ -77,6 +61,6 @@ CLI options override YAML. `--dashboard` forces enable, `--robot-id` overrides `
 
 Do not run these commands on a machine without camera, gimbal, CAN, and model assets.
 
-## Frontend Assets
+## Frontend Split
 
-`dashboard/index.html` loads local vendor assets from `dashboard/vendor/`: MQTT.js, ECharts, and GridStack. Versions and source URLs are recorded in `dashboard/vendor/README.md`; no npm build step is required.
+The Dashboard browser client and service stack have moved to an independent frontend repository. This repository keeps only the C++ MQTT backend and protocol documentation.

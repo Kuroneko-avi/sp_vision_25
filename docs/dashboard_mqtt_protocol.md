@@ -49,7 +49,7 @@ QoS 0 用于状态、日志和参数快照，允许丢包并由下一帧或下�
 {
   "timestamp": 1770000000000,
   "level": "info",
-  "source": "standard_mpc",
+  "source": "auto_aim_debug_mpc",
   "message": "tracker locked"
 }
 ```
