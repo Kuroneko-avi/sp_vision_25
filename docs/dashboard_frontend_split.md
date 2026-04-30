@@ -2,15 +2,15 @@
 
 领导要求 `sp_vision_25` 长期保持为视觉代码仓库，因此 Dashboard panel 前端已从本仓库拆出。当前仓库只保留 MQTT 后端能力：topic/payload 契约、C++ bridge、参数 schema/current 和 `auto_aim_debug_mpc` 接入。
 
-## Target Repository
+## Frontend Repository
 
-建议新建独立仓库：
+正式前端仓库路径：
 
 ```text
-sp_vision_dashboard_panel
+/home/ywag/sp_vision_dashboard_panel
 ```
 
-建议职责：
+该仓库职责：
 
 - 提供 Dashboard browser UI。
 - 提供 style assets 和 browser-side modules。
@@ -20,44 +20,58 @@ sp_vision_dashboard_panel
 - 不包含视觉算法代码。
 - 只通过 MQTT 协议和 `sp_vision_25` 通信。
 
-## Suggested Layout
+## Current Split
 
-为避免视觉仓库重新出现前端残留，这里用语义化名称描述迁移结构；新仓库可按前端团队习惯命名入口 HTML、样式目录、脚本目录和第三方依赖目录。
+`sp_vision_25` 只维护：
+
+- MQTT topic/payload 契约。
+- C++ `MqttBridge`。
+- `DashboardParams`。
+- `auto_aim_debug_mpc` 接入。
+- Paho MQTT C++ 可选探测和链接逻辑。
+
+`sp_vision_dashboard_panel` 维护：
+
+- Dashboard UI。
+- CSS/JS/vendor。
+- Mosquitto container。
+- HTTP static server。
+- Dashboard startup/check/smoke scripts。
+
+`standard_mpc.cpp` 不接入 Dashboard，保持 upstream/main 行为。
+
+## Frontend Repository Layout
 
 ```text
 sp_vision_dashboard_panel/
   dashboard/
-    html entry
-    styles/
-    browser modules/
-    third party frontend assets/
+    index.html
+    css/
+    js/
+    vendor/
   docker/
     Dockerfile
     mosquitto.conf
     entrypoint.sh
   docker-compose.yml
+  scripts/
+    dashboard_up.sh
+    dashboard_down.sh
+    dashboard_check.sh
+    dashboard_smoke.sh
   docs/
     usage.md
     protocol.md
   README.md
 ```
 
-## Seed Copy
+## Seed Copy Status
 
-本次提交前已把当前前端成果复制到未纳入 git 的临时目录：
+`/tmp/sp_vision_dashboard_panel_seed/` 只是本次迁移使用的临时种子目录，不是长期方案。正式前端成果已经落到：
 
 ```text
-/tmp/sp_vision_dashboard_panel_seed/
+/home/ywag/sp_vision_dashboard_panel
 ```
-
-该目录包含：
-
-- 旧浏览器 Dashboard 资源目录。
-- 旧 Dashboard service container 目录。
-- 旧 compose 文件副本。
-- MQTT 协议文档副本。
-
-该目录不属于 `sp_vision_25`，不会随本仓库提交。创建新仓库时，可从该临时目录迁入需要保留的前端成果。
 
 ## Contract Source
 
