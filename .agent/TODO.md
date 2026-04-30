@@ -11,7 +11,7 @@
 - 2026-04-04 已完成一次全局上下文审计，`standard_mpc` 与 `auto_aim_debug_mpc` 的核心知识已同步到 `.agent/`。
 - 已沉淀的主题包括：标准 MPC 数据链路、调试模式 JSON 字段、坐标系系统、控制指令语义、下位机通信协议。
 - 2026-04-26 MQTT Dashboard 第二阶段 E/F 基线进入合并收尾：Docker smoke 与前端控制面板已对齐，协议裁剪为不承载图像或视频流。
-- 2026-04-26 MQTT Dashboard 第二阶段 H 已实现热调参模型与 Planner/Buff Aimer 线程安全 apply 接口；尚未接入 MQTT/Paho 或业务入口。
+- 2026-04-26 MQTT Dashboard 第二阶段 H 曾实现热调参模型与 Planner/Buff Aimer apply 接口；2026-04-30 范围收缩后当前只保留 Planner 热更新。
 - 2026-04-27 MQTT Dashboard 第二阶段 G/H 合并收口完成：`control/cmd` 统一使用 `command` 字段，`DashboardParams` 完整 payload 通过 `MqttBridge::*_payload` 接口发布，I 阶段可接入业务入口。
 - 2026-04-27 MQTT Dashboard 前端已融合 `preview.html` 布局，参数面板改为基于 `configs/standard3.yaml` 的 schema 目录，非热参数只读展示。
 - 2026-04-27 MQTT Dashboard 生产收口：Dashboard 网络服务与视觉主程序分离，主程序由人工在真实硬件环境启动。
@@ -20,6 +20,7 @@
 - 2026-04-29 MQTT Dashboard 静态前端已拆为多文件结构，协议契约集中到 `dashboard/js/protocol.js`，MQTT transport 集中到 `dashboard/js/mqtt_transport.js`，仍不需要 npm build。
 - 2026-04-29 MQTT Dashboard 前端已升级为轻量 Panel 工作台：本地 vendor `mqtt.js`、ECharts、GridStack，核心通信在 `dashboard/js/core/`，面板在 `dashboard/js/panels/`，新增只读 Raw MQTT 面板。
 - 2026-04-29 MQTT Dashboard 合并前边界收口：Dashboard CLI helper 改为 `tools/dashboard_cli.*` 并归入 `dashboard_config`，前端 control topic 映射回收到 `core/protocol.js`，vendor license 信息已补齐。
+- 2026-04-30 MQTT Dashboard PR 范围已收缩为 `auto_aim_debug_mpc` only：`standard_mpc` 回到 upstream/main 行为，打符热参链路移除，Dashboard UI/HTTP 服务只由 `dashboard-net` 提供。
 - 当前没有明确进行中的功能任务；本文件现阶段主要承担“维护面板”和“回填入口”的作用。
 - 历史任务细节已归档到下文，不再在顶部重复展开。
 
@@ -66,7 +67,8 @@
 - **2026-04-29**: 完成 Dashboard 静态前端解耦：`index.html`、`css/dashboard.css` 与 `js/*.js` 分离，容器改为复制整个 `dashboard/` 目录。
 - **2026-04-29**: 完成 Dashboard Panel 工作台升级：引入本地 vendor `mqtt.js`、ECharts、GridStack，建立 `core/` 与 `panels/` 分层和 Raw MQTT 只读调试面板。
 - **2026-04-29**: 完成 Dashboard 合并前解耦卫生收尾：CLI helper 命名和 CMake 归属收紧、前端 control topic 映射收回协议层、vendor license 补齐。
-- **2026-04-26**: 完成 Dashboard 热参数模型 H：新增 `DashboardParams`、Planner/Buff Aimer 热参数快照与单参数 apply，验证范围不包含 TinyMPC Q/R/max_acc 热修改。
+- **2026-04-30**: 收缩 Dashboard PR 范围：只保留 `auto_aim_debug_mpc` 接入，`standard_mpc` 与 `buff_aimer.*` 回退到 upstream/main，文档补充同机/分离 LAN 拓扑。
+- **2026-04-26**: 完成 Dashboard 热参数模型 H：新增 `DashboardParams`、Planner/Buff Aimer 热参数快照与单参数 apply，验证范围不包含 TinyMPC Q/R/max_acc 热修改；2026-04-30 后 Buff Aimer 热参链路已按新范围移除。
 - **2026-04-15**: 将隐藏知识目录更名为 `.agent/`，并同步更新仓库内所有元规则与文档引用路径。
 - **2026-04-15**: 将仓库根 `AGENTS.md` 重写为精简的元规则入口文件，仅保留上下文加载顺序、知识路由与收尾同步要求。
 - **2026-04-04**: 完成一次全局架构审计，并沉淀标准链路、调试字段、坐标系、控制指令和通信协议等核心知识。

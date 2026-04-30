@@ -121,7 +121,7 @@ QoS 0 用于状态、日志和参数快照，允许丢包并由下一帧或下�
 
 `options` 仅允许在 `type = "enum"` 时使用。`number` 的 `min`、`max`、`step` 可按参数需要提供；非 `number` 参数不使用这些字段。
 
-当前 MPC Dashboard 参数目录以 `configs/standard3.yaml` 为 source of truth 生成。已接入热更新链路的 Planner/Buff Aimer 参数会设置 `editable: true`，`params/current` 中的值来自运行态快照；其他标量、数组、矩阵和标定参数只展示 YAML 初值，设置 `editable: false` 与 `restart_required: true`。
+当前 MPC Dashboard 参数目录以 `configs/standard3.yaml` 为 source of truth 生成。已接入热更新链路的 Planner 参数会设置 `editable: true`，`params/current` 中的值来自运行态快照；其他标量、数组、矩阵、标定参数和打符相关配置只展示 YAML 初值，设置 `editable: false` 与 `restart_required: true`。当前 Dashboard 只接入 `auto_aim_debug_mpc`，不接入 `standard_mpc`。
 
 ## `{robot_id}/params/current`
 

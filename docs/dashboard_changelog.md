@@ -9,7 +9,7 @@
 - 新增独立 Dashboard 网络服务容器：`docker-compose.dashboard.yml`、`docker/dashboard/*`。
 - 新增 MQTT 通信层：`tools/mqtt_bridge.*`、`tools/dashboard_mqtt_contract.hpp`。
 - 新增 Dashboard 参数模型：`tools/dashboard_params.*`、`tools/dashboard_config.*`。
-- `standard_mpc` 与 `auto_aim_debug_mpc` 支持通过 MQTT 发布 telemetry、log、params/schema、params/current，并消费 control/param、control/cmd。
+- Dashboard 当前只接入 `auto_aim_debug_mpc`：通过 MQTT 发布 telemetry、log、params/schema、params/current，并消费 control/param、control/cmd。`standard_mpc` 保持 upstream/main 行为，不链接 Dashboard 目标。
 - `configs/standard3.yaml` 新增 `dashboard` 配置段。
 
 本功能不包含图像流、视频流、MJPEG 或 Web terminal。
@@ -25,15 +25,14 @@
    - 默认开放到主机全部网卡，允许局域网访问。
 
 2. 视觉主程序
-   - `standard_mpc`
    - `auto_aim_debug_mpc`
-   - 在真实硬件环境中单独启动，通过 MQTT 连接 Dashboard 网络服务。
+   - 在真实硬件环境中单独启动，通过 MQTT native `1883` 连接 Dashboard 网络服务。
 
 两者只通过 MQTT 通信。Dashboard 容器不启动视觉主程序，也不启动 mock publisher。
 
 ## 新增依赖
 
-视觉主程序构建或运行 Dashboard MQTT 功能需要：
+`auto_aim_debug_mpc` 构建或运行 Dashboard MQTT 功能需要：
 
 ```bash
 sudo apt update
@@ -90,7 +89,7 @@ dashboard:
 
 默认 `enabled: false`，目的是合入 main 后不改变原有主程序启动行为。
 
-生产启用方式二选一：
+`auto_aim_debug_mpc` 的生产启用方式二选一：
 
 1. 修改部署用 YAML：
 
@@ -104,7 +103,7 @@ dashboard:
 2. 启动时使用 CLI 覆盖：
 
 ```bash
-./build/standard_mpc --dashboard --robot-id myrobot --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
+./build/auto_aim_debug_mpc --dashboard --robot-id myrobot --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
 ```
 
 CLI 优先级高于 YAML：
@@ -142,22 +141,16 @@ Broker URL: ws://主机IP:9001
 Robot ID: myrobot
 ```
 
-再启动真实视觉主程序：
+再启动真实 Dashboard 视觉入口：
 
 ```bash
-./build/standard_mpc --dashboard configs/standard3.yaml
+./build/auto_aim_debug_mpc --dashboard --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
 ```
 
-或：
+如果 Dashboard 网络服务在另一台电脑上，视觉程序使用对端 LAN IP：
 
 ```bash
-./build/auto_aim_debug_mpc --dashboard configs/standard3.yaml
-```
-
-如果 YAML 中 `dashboard.enabled` 保持 `false`，则使用：
-
-```bash
-./build/standard_mpc --dashboard configs/standard3.yaml
+./build/auto_aim_debug_mpc --dashboard --mqtt-host tcp://Dashboard主机IP:1883 configs/standard3.yaml
 ```
 
 停止 Dashboard 网络服务：
@@ -175,17 +168,25 @@ http://主机IP:8080
 ws://主机IP:9001
 ```
 
-视觉主程序与 Dashboard 网络服务在同一主机网络命名空间时连接：
+拓扑 A：Dashboard 服务和视觉程序在同一台机器人/主机上。
 
 ```text
-tcp://127.0.0.1:1883
+auto_aim_debug_mpc -> tcp://127.0.0.1:1883
+浏览器设备 -> http://机器人IP:8080
+浏览器 MQTT WS -> ws://机器人IP:9001
 ```
 
-如果视觉主程序在另一台机器或另一网络命名空间中，连接：
+这里 C++ 用 `127.0.0.1` 是合理的，因为 broker 与视觉程序在同一网络命名空间；浏览器仍通过网线或 LAN 访问机器人 IP 获取 UI/CSS/JS。
+
+拓扑 B：Dashboard 服务在另一台电脑上，视觉程序在机器人上。
 
 ```text
-tcp://主机IP:1883
+auto_aim_debug_mpc -> tcp://Dashboard电脑IP:1883
+浏览器设备 -> http://Dashboard电脑IP:8080
+浏览器 MQTT WS -> ws://Dashboard电脑IP:9001
 ```
+
+`127.0.0.1` 不是唯一生产写法；如果 broker 不在视觉程序同一网络命名空间，`--mqtt-host` 必须使用对端 LAN IP。
 
 如果未来只想本机访问，可以手动把 compose 改为 `127.0.0.1:端口:端口`；当前默认不要这样做。
 
@@ -206,9 +207,10 @@ curl --noproxy "*" -I http://127.0.0.1:8080
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target standard_mpc auto_aim_debug_mpc dashboard_params_test -j$(nproc)
+cmake --build build --target auto_aim_debug_mpc dashboard_params_test -j$(nproc)
+cmake --build build --target standard_mpc -j$(nproc)
 ./scripts/dashboard_net_up.sh
-./build/standard_mpc --dashboard configs/standard3.yaml
+./build/auto_aim_debug_mpc --dashboard --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
 ```
 
 浏览器中确认：
@@ -221,5 +223,6 @@ cmake --build build --target standard_mpc auto_aim_debug_mpc dashboard_params_te
 ## 合并注意事项
 
 - 合入 main 前应在具备 CMake、OpenVINO、Paho MQTT C++、nlohmann_json 的环境中完成 C++ 构建验证。
+- Dashboard PR review 只针对 `auto_aim_debug_mpc` 接入；`standard_mpc` 不作为 Dashboard 使用示例。
 - 不应重新引入无硬件开发路径，例如 `--mock-runtime`、`--video-source`、`--video-loop`、mock publisher 或 hardwareless smoke 脚本。
 - 真实相机、串口和 CAN 验证应在硬件环境中单独完成。

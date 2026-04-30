@@ -35,7 +35,6 @@ target_link_libraries(dashboard_params
         nlohmann_json::nlohmann_json
         yaml-cpp
         auto_aim
-        auto_buff
         tools
 )
 
@@ -61,12 +60,10 @@ add_executable(uav_debug src/uav_debug.cpp)
 
 target_link_libraries(standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(mt_standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
-target_link_libraries(standard_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io dashboard_config)
+target_link_libraries(standard_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(auto_aim_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io dashboard_config)
 if(TARGET mqtt_bridge)
-    target_link_libraries(standard_mpc mqtt_bridge dashboard_params)
     target_link_libraries(auto_aim_debug_mpc mqtt_bridge dashboard_params)
-    target_compile_definitions(standard_mpc PRIVATE SP_VISION_ENABLE_DASHBOARD_MQTT)
     target_compile_definitions(auto_aim_debug_mpc PRIVATE SP_VISION_ENABLE_DASHBOARD_MQTT)
 endif()
 target_link_libraries(mt_auto_aim_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)

@@ -12,11 +12,6 @@ namespace auto_aim
 class Planner;
 }  // namespace auto_aim
 
-namespace auto_buff
-{
-class Aimer;
-}  // namespace auto_buff
-
 namespace tools
 {
 namespace dashboard
@@ -30,10 +25,6 @@ struct DashboardParamSnapshot
   double planner_decision_speed;
   double planner_high_speed_delay_time;
   double planner_low_speed_delay_time;
-  double buff_yaw_offset_deg;
-  double buff_pitch_offset_deg;
-  double buff_fire_gap_time;
-  double buff_predict_time;
 };
 
 struct DashboardParamUpdate
@@ -69,11 +60,8 @@ public:
 
   DashboardParams(SnapshotReader read_snapshot, ParamWriter write_param, bool include_buff = true);
   explicit DashboardParams(auto_aim::Planner & planner);
-  DashboardParams(auto_aim::Planner & planner, auto_buff::Aimer & buff_aimer);
   DashboardParams(
     const std::string & config_path, auto_aim::Planner & planner, bool include_buff = false);
-  DashboardParams(
-    const std::string & config_path, auto_aim::Planner & planner, auto_buff::Aimer & buff_aimer);
 
   nlohmann::json make_schema() const;
   nlohmann::json make_current(std::int64_t timestamp) const;

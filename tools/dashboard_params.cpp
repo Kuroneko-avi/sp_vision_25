@@ -11,7 +11,6 @@
 #include <yaml-cpp/yaml.h>
 
 #include "tasks/auto_aim/planner/planner.hpp"
-#include "tasks/auto_buff/buff_aimer.hpp"
 #include "tools/dashboard_mqtt_contract.hpp"
 #include "tools/yaml.hpp"
 
@@ -75,19 +74,7 @@ const std::vector<ParamSpec> & legacy_param_specs()
       &DashboardParamSnapshot::planner_high_speed_delay_time, 0.0, 0.5, 0.001, "s", "planner"),
     make_number_spec(
       "planner.low_speed_delay_time", "low_speed_delay_time",
-      &DashboardParamSnapshot::planner_low_speed_delay_time, 0.0, 0.5, 0.001, "s", "planner"),
-    make_number_spec(
-      "buff.yaw_offset_deg", "yaw_offset_deg", &DashboardParamSnapshot::buff_yaw_offset_deg, -20.0,
-      20.0, 0.1, "deg", "buff"),
-    make_number_spec(
-      "buff.pitch_offset_deg", "pitch_offset_deg", &DashboardParamSnapshot::buff_pitch_offset_deg,
-      -20.0, 20.0, 0.1, "deg", "buff"),
-    make_number_spec(
-      "buff.fire_gap_time", "fire_gap_time", &DashboardParamSnapshot::buff_fire_gap_time, 0.0, 5.0,
-      0.001, "s", "buff"),
-    make_number_spec(
-      "buff.predict_time", "predict_time", &DashboardParamSnapshot::buff_predict_time, 0.0, 1.0,
-      0.001, "s", "buff")};
+      &DashboardParamSnapshot::planner_low_speed_delay_time, 0.0, 0.5, 0.001, "s", "planner")};
   return specs;
 }
 
@@ -317,15 +304,6 @@ std::vector<ParamSpec> make_standard3_specs(const std::string & config_path, boo
     specs, "fire_thresh", "planner.fire_thresh", "fire_thresh",
     &DashboardParamSnapshot::planner_fire_thresh, 0.0, 0.05, 0.0001, "rad", "planner");
 
-  if (include_buff) {
-    make_hot(
-      specs, "fire_gap_time", "buff_aimer.fire_gap_time", "fire_gap_time",
-      &DashboardParamSnapshot::buff_fire_gap_time, 0.0, 5.0, 0.001, "s", "buff_aimer");
-    make_hot(
-      specs, "predict_time", "buff_aimer.predict_time", "predict_time",
-      &DashboardParamSnapshot::buff_predict_time, 0.0, 1.0, 0.001, "s", "buff_aimer");
-  }
-
   return specs;
 }
 
@@ -390,11 +368,6 @@ DashboardParams::DashboardParams(auto_aim::Planner & planner)
 {
 }
 
-DashboardParams::DashboardParams(auto_aim::Planner & planner, auto_buff::Aimer & buff_aimer)
-: DashboardParams(STANDARD3_CONFIG_PATH, planner, buff_aimer)
-{
-}
-
 DashboardParams::DashboardParams(
   const std::string & config_path, auto_aim::Planner & planner, bool include_buff)
 : DashboardParams(
@@ -406,48 +379,12 @@ DashboardParams::DashboardParams(
         planner_params.fire_thresh,
         planner_params.decision_speed,
         planner_params.high_speed_delay_time,
-        planner_params.low_speed_delay_time,
-        0.0,
-        0.0,
-        0.0,
-        0.0};
+        planner_params.low_speed_delay_time};
     },
     [&planner](const DashboardParamUpdate & update) {
       return planner.apply_hot_param(update.local_key, update.value);
     },
     include_buff)
-{
-  params_ = make_standard3_specs(config_path, include_buff_);
-}
-
-DashboardParams::DashboardParams(
-  const std::string & config_path, auto_aim::Planner & planner, auto_buff::Aimer & buff_aimer)
-: DashboardParams(
-    [&planner, &buff_aimer]() {
-      const auto planner_params = planner.get_hot_params();
-      const auto buff_params = buff_aimer.get_hot_params();
-      return DashboardParamSnapshot{
-        planner_params.yaw_offset_deg,
-        planner_params.pitch_offset_deg,
-        planner_params.fire_thresh,
-        planner_params.decision_speed,
-        planner_params.high_speed_delay_time,
-        planner_params.low_speed_delay_time,
-        buff_params.yaw_offset_deg,
-        buff_params.pitch_offset_deg,
-        buff_params.fire_gap_time,
-        buff_params.predict_time};
-    },
-    [&planner, &buff_aimer](const DashboardParamUpdate & update) {
-      if (update.key.rfind("buff_aimer.", 0) == 0) {
-        return buff_aimer.apply_hot_param(update.local_key, update.value);
-      }
-      if (update.key.rfind("aimer.", 0) == 0 || update.key.rfind("planner.", 0) == 0) {
-        return planner.apply_hot_param(update.local_key, update.value);
-      }
-      return false;
-    },
-    true)
 {
   params_ = make_standard3_specs(config_path, include_buff_);
 }

@@ -16,10 +16,6 @@ bool close_to(double lhs, double rhs)
   return std::abs(lhs - rhs) < 1e-9;
 }
 
-bool starts_with(const std::string & value, const std::string & prefix)
-{
-  return value.rfind(prefix, 0) == 0;
-}
 }  // namespace
 
 int main()
@@ -32,10 +28,6 @@ int main()
     double planner_decision_speed = 7.0;
     double planner_high_speed_delay_time = 0.065;
     double planner_low_speed_delay_time = 0.052;
-    double buff_yaw_offset_rad = 3.0 * DEG_TO_RAD;
-    double buff_pitch_offset_rad = -4.0 * DEG_TO_RAD;
-    double buff_fire_gap_time = 0.7;
-    double buff_predict_time = 0.12;
   } state;
 
   auto read_snapshot = [&state]() {
@@ -45,11 +37,7 @@ int main()
       state.planner_fire_thresh,
       state.planner_decision_speed,
       state.planner_high_speed_delay_time,
-      state.planner_low_speed_delay_time,
-      state.buff_yaw_offset_rad * RAD_TO_DEG,
-      state.buff_pitch_offset_rad * RAD_TO_DEG,
-      state.buff_fire_gap_time,
-      state.buff_predict_time};
+      state.planner_low_speed_delay_time};
   };
 
   auto write_param = [&state](const tools::dashboard::DashboardParamUpdate & update) {
@@ -65,14 +53,6 @@ int main()
       state.planner_high_speed_delay_time = update.value;
     } else if (update.key == "planner.low_speed_delay_time") {
       state.planner_low_speed_delay_time = update.value;
-    } else if (update.key == "buff.yaw_offset_deg") {
-      state.buff_yaw_offset_rad = update.value * DEG_TO_RAD;
-    } else if (update.key == "buff.pitch_offset_deg") {
-      state.buff_pitch_offset_rad = update.value * DEG_TO_RAD;
-    } else if (update.key == "buff.fire_gap_time") {
-      state.buff_fire_gap_time = update.value;
-    } else if (update.key == "buff.predict_time") {
-      state.buff_predict_time = update.value;
     } else {
       return false;
     }
@@ -83,12 +63,11 @@ int main()
 
   const auto schema = params.make_schema();
   assert(schema.at("version") == 1);
-  assert(schema.at("params").size() == 10);
+  assert(schema.at("params").size() == 6);
 
   const auto current = params.make_current(1234);
   assert(current.at("timestamp") == 1234);
   assert(close_to(current.at("values").at("planner.yaw_offset_deg").get<double>(), 1.0));
-  assert(close_to(current.at("values").at("buff.pitch_offset_deg").get<double>(), -4.0));
 
   const auto applied = params.apply("planner.fire_thresh", 0.01);
   assert(applied.ok);
@@ -105,7 +84,7 @@ int main()
   assert(!unknown.ok);
   assert(unknown.status == tools::dashboard::DashboardParamStatus::UnknownKey);
 
-  const auto type_error = params.apply("buff.predict_time", "0.2");
+  const auto type_error = params.apply("planner.decision_speed", "0.2");
   assert(!type_error.ok);
   assert(type_error.status == tools::dashboard::DashboardParamStatus::TypeError);
 
@@ -115,32 +94,24 @@ int main()
   assert(close_to(
     params.make_current(1235).at("values").at("planner.yaw_offset_deg").get<double>(), 10.0));
 
-  const auto buff_deg = params.apply("buff.pitch_offset_deg", -5.5);
-  assert(buff_deg.ok);
-  assert(close_to(state.buff_pitch_offset_rad, -5.5 * DEG_TO_RAD));
-  assert(close_to(
-    params.make_current(1236).at("values").at("buff.pitch_offset_deg").get<double>(), -5.5));
-
   tools::dashboard::DashboardParams planner_only(read_snapshot, write_param, false);
   const auto planner_only_schema = planner_only.make_schema();
   assert(planner_only_schema.at("params").size() == 6);
   for (const auto & item : planner_only_schema.at("params")) {
     const auto key = item.at("key").get<std::string>();
-    assert(starts_with(key, "planner."));
-    assert(!starts_with(key, "buff."));
+    assert(key.rfind("planner.", 0) == 0);
   }
 
   const auto planner_only_current = planner_only.make_current(2234);
   assert(planner_only_current.at("timestamp") == 2234);
   assert(planner_only_current.at("values").contains("planner.fire_thresh"));
   for (const auto & item : planner_only_current.at("values").items()) {
-    assert(starts_with(item.key(), "planner."));
-    assert(!starts_with(item.key(), "buff."));
+    assert(item.key().rfind("planner.", 0) == 0);
   }
 
-  const auto planner_only_buff = planner_only.apply("buff.predict_time", 0.2);
-  assert(!planner_only_buff.ok);
-  assert(planner_only_buff.status == tools::dashboard::DashboardParamStatus::UnknownKey);
+  const auto planner_only_unknown = planner_only.apply("planner.max_yaw_acc", 50.0);
+  assert(!planner_only_unknown.ok);
+  assert(planner_only_unknown.status == tools::dashboard::DashboardParamStatus::UnknownKey);
 
   const auto command_payload =
     tools::dashboard::make_control_cmd_payload("request-1", "republish_params", 3456);

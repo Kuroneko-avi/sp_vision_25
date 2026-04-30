@@ -3,7 +3,7 @@
 Dashboard production runtime is split into two independent services:
 
 - `dashboard-net`: Mosquitto native MQTT, MQTT over WebSocket, and static HTTP Dashboard.
-- vision app: `standard_mpc` or `auto_aim_debug_mpc`, started separately with real camera, gimbal, CAN, model, and config dependencies.
+- vision app: `auto_aim_debug_mpc`, started separately with real camera, gimbal, CAN, model, and config dependencies.
 
 The two sides communicate only through MQTT topics.
 
@@ -52,16 +52,10 @@ scripts/dashboard_net_down.sh
 
 ## Start Vision App
 
-Start the real vision program outside the Dashboard container:
+Start the real Dashboard-enabled vision program outside the Dashboard container:
 
 ```bash
-./build/standard_mpc --dashboard configs/standard3.yaml
-```
-
-or:
-
-```bash
-./build/auto_aim_debug_mpc --dashboard configs/standard3.yaml
+./build/auto_aim_debug_mpc --dashboard --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
 ```
 
 Dashboard startup is controlled by the YAML `dashboard` block:
@@ -73,33 +67,41 @@ dashboard:
   mqtt_host: "tcp://127.0.0.1:1883"
 ```
 
-The merged main baseline keeps `enabled: false` by default so existing robot startup behavior does not change. For production Dashboard use, either change it to `true` in the deployed config or pass `--dashboard`.
+The merged main baseline keeps `enabled: false` by default so existing robot startup behavior does not change. For production Dashboard use, either change it to `true` in the deployed config or pass `--dashboard` to `auto_aim_debug_mpc`.
 
 Command line options still override YAML:
 
 ```bash
-./build/standard_mpc --dashboard --robot-id hero --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
+./build/auto_aim_debug_mpc --dashboard --robot-id hero --mqtt-host tcp://127.0.0.1:1883 configs/standard3.yaml
 ```
 
 Passing `--dashboard` forces Dashboard on even if `dashboard.enabled` is `false`.
 
-When the vision app runs on the same host namespace as the Dashboard network service, keep:
+Topology A: Dashboard service and the vision app run on the same robot or host.
 
 ```text
-tcp://127.0.0.1:1883
+auto_aim_debug_mpc -> tcp://127.0.0.1:1883
+browser device -> http://机器人IP:8080
+browser MQTT WS -> ws://机器人IP:9001
 ```
 
-If the vision app runs on another machine or in another network namespace, use:
+In this topology, `127.0.0.1` is correct for the C++ process because the MQTT broker is in the same host network namespace. The browser still uses the robot LAN IP over the cable or local network to fetch HTML/CSS/JS and connect to MQTT over WebSocket.
+
+Topology B: Dashboard service runs on another computer, while the vision app runs on the robot.
 
 ```text
-tcp://主机IP:1883
+auto_aim_debug_mpc -> tcp://Dashboard电脑IP:1883
+browser device -> http://Dashboard电脑IP:8080
+browser MQTT WS -> ws://Dashboard电脑IP:9001
 ```
+
+`127.0.0.1` is not the only production address. If the broker is not in the same network namespace as `auto_aim_debug_mpc`, use the Dashboard host LAN IP for `--mqtt-host`.
 
 If a future deployment only wants local access, manually change `docker-compose.dashboard.yml` to bind `127.0.0.1:端口:端口`. The current default intentionally allows LAN access.
 
 ## Extra Dependencies For Dashboard Feature
 
-Vision app build/runtime needs:
+Dashboard-enabled `auto_aim_debug_mpc` build/runtime needs:
 
 - `libpaho-mqtt-dev`
 - `libpaho-mqttpp-dev`
@@ -148,6 +150,6 @@ No npm, Vite, React, Vue, or build step is required for the current Dashboard ru
 The current runtime has exactly two service shapes:
 
 - Dashboard network service container.
-- real vision app, started separately in the hardware environment.
+- real `auto_aim_debug_mpc`, started separately in the hardware environment.
 
-The production startup path does not include image/video/MJPEG, Web terminal, mock runtime, video-source, hardwareless smoke, or mock publisher entrypoints. Start the real vision app manually in its own environment.
+The production startup path does not include image/video/MJPEG, Web terminal, mock runtime, video-source, hardwareless smoke, or mock publisher entrypoints. The vision program is only an MQTT native client on `1883`; it does not serve HTML, CSS, JS, or any HTTP endpoint. `standard_mpc` remains the normal non-Dashboard business entry.

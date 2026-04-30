@@ -6,7 +6,6 @@
 #include <Eigen/Dense>
 #include <chrono>
 #include <cmath>
-#include <mutex>
 #include <vector>
 
 #include "../auto_aim/planner/planner.hpp"
@@ -20,14 +19,6 @@ namespace auto_buff
 class Aimer
 {
 public:
-  struct HotParams
-  {
-    double yaw_offset_deg;
-    double pitch_offset_deg;
-    double fire_gap_time;
-    double predict_time;
-  };
-
   Aimer(const std::string & config_path);
 
   io::Command aim(
@@ -40,11 +31,8 @@ public:
 
   double angle;      ///
   double t_gap = 0;  ///
-  HotParams get_hot_params() const;
-  bool apply_hot_param(const std::string & key, double value);
 
 private:
-  mutable std::mutex params_mutex_;
   SmallTarget target_;
   double yaw_offset_;
   double pitch_offset_;

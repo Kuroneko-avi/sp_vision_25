@@ -33,6 +33,26 @@ Use these frontend connection values when running locally:
 
 The page will show telemetry and parameters after a separately started vision app publishes MQTT messages.
 
+For a real LAN or cable setup, open `http://<host-ip>:8080` from the browser device and set Broker URL to `ws://<host-ip>:9001`.
+
+Topology A: Dashboard service and `auto_aim_debug_mpc` run on the same robot or host.
+
+```text
+auto_aim_debug_mpc -> tcp://127.0.0.1:1883
+browser device -> http://机器人IP:8080
+browser MQTT WS -> ws://机器人IP:9001
+```
+
+Topology B: Dashboard service runs on another computer, while `auto_aim_debug_mpc` runs on the robot.
+
+```text
+auto_aim_debug_mpc -> tcp://Dashboard电脑IP:1883
+browser device -> http://Dashboard电脑IP:8080
+browser MQTT WS -> ws://Dashboard电脑IP:9001
+```
+
+`127.0.0.1` is only correct for the C++ process when the broker is in the same network namespace. Otherwise use the Dashboard host LAN IP.
+
 ## Check Ports
 
 ```bash
@@ -68,3 +88,4 @@ scripts/dashboard_net_down.sh
 - publish telemetry by itself
 - access camera, serial, CAN, OpenVINO, or model files
 - mount hardware devices
+- serve from any C++ vision process

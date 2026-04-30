@@ -14,8 +14,28 @@
 
 - 浏览器访问：`http://主机IP:8080`
 - 前端 Broker URL：`ws://主机IP:9001`
-- 主程序同机连接：`tcp://127.0.0.1:1883`
-- 主程序在另一台机器或另一网络命名空间中连接：`tcp://主机IP:1883`
+- `auto_aim_debug_mpc` 同机连接：`tcp://127.0.0.1:1883`
+- `auto_aim_debug_mpc` 在另一台机器或另一网络命名空间中连接：`tcp://Dashboard主机IP:1883`
+
+拓扑 A：Dashboard 服务和视觉程序在同一台机器人/主机上。
+
+```text
+auto_aim_debug_mpc -> tcp://127.0.0.1:1883
+浏览器设备 -> http://机器人IP:8080
+浏览器 MQTT WS -> ws://机器人IP:9001
+```
+
+这里 C++ 用 `127.0.0.1` 是合理的，因为 broker 在同一台主机；浏览器仍通过网线或 LAN 访问机器人 IP 获取 UI/CSS/JS。
+
+拓扑 B：Dashboard 服务在另一台电脑上，视觉程序在机器人上。
+
+```text
+auto_aim_debug_mpc -> tcp://Dashboard电脑IP:1883
+浏览器设备 -> http://Dashboard电脑IP:8080
+浏览器 MQTT WS -> ws://Dashboard电脑IP:9001
+```
+
+`127.0.0.1` 不是唯一生产写法；如果 broker 不在视觉程序同一网络命名空间，必须用对端 LAN IP。
 
 如果未来只想本机访问，可以手动把 compose 端口改为 `127.0.0.1:端口:端口`，但本次默认不要这样做。
 
@@ -93,4 +113,4 @@ bash scripts/dashboard_mqtt_smoke.sh
 
 ## 生产边界
 
-当前只有两个服务形态：Dashboard 网络服务容器，以及单独启动的真实视觉主程序。不包含 image/video/MJPEG、Web terminal、mock runtime、video-source、hardwareless smoke 或 mock publisher。
+当前只有两个服务形态：Dashboard 网络服务容器，以及单独启动的真实 `auto_aim_debug_mpc`。视觉程序只作为 MQTT client，不提供 HTTP 静态服务，也不包含 HTML/CSS/JS。当前不包含 image/video/MJPEG、Web terminal、mock runtime、video-source、hardwareless smoke 或 mock publisher。
