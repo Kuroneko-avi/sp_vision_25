@@ -1,6 +1,7 @@
 #include "armor.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <opencv2/opencv.hpp>
 
@@ -15,15 +16,31 @@ Lightbar::Lightbar(const cv::RotatedRect & rotated_rect, std::size_t id)
     return a.y < b.y;
   });
 
+  std::array<cv::Point2f, 2> top_pair = {corners[0], corners[1]};
+  std::array<cv::Point2f, 2> bottom_pair = {corners[2], corners[3]};
+  std::sort(top_pair.begin(), top_pair.end(), [](const cv::Point2f & a, const cv::Point2f & b) {
+    return a.x < b.x;
+  });
+  std::sort(bottom_pair.begin(), bottom_pair.end(), [](const cv::Point2f & a, const cv::Point2f & b) {
+    return a.x < b.x;
+  });
+
+  left_top = top_pair[0];
+  right_top = top_pair[1];
+  right_bottom = bottom_pair[1];
+  left_bottom = bottom_pair[0];
+
   center = rotated_rect.center;
-  top = (corners[0] + corners[1]) / 2;
-  bottom = (corners[2] + corners[3]) / 2;
+  top = (left_top + right_top) / 2;
+  bottom = (left_bottom + right_bottom) / 2;
   top2bottom = bottom - top;
 
-  points.emplace_back(top);
-  points.emplace_back(bottom);
+  points.emplace_back(left_top);
+  points.emplace_back(right_top);
+  points.emplace_back(right_bottom);
+  points.emplace_back(left_bottom);
 
-  width = cv::norm(corners[0] - corners[1]);
+  width = cv::norm(top_pair[0] - top_pair[1]);
   angle = std::atan2(top2bottom.y, top2bottom.x);
   angle_error = std::abs(angle - CV_PI / 2);
   length = cv::norm(top2bottom);
@@ -37,10 +54,18 @@ Armor::Armor(const Lightbar & left, const Lightbar & right)
   color = left.color;
   center = (left.center + right.center) / 2;
 
-  points.emplace_back(left.top);
-  points.emplace_back(right.top);
-  points.emplace_back(right.bottom);
-  points.emplace_back(left.bottom);
+  const bool use_left_edges = left.width < right.width;
+  if (use_left_edges) {
+    points.emplace_back(left.left_top);
+    points.emplace_back(right.left_top);
+    points.emplace_back(right.left_bottom);
+    points.emplace_back(left.left_bottom);
+  } else {
+    points.emplace_back(left.right_top);
+    points.emplace_back(right.right_top);
+    points.emplace_back(right.right_bottom);
+    points.emplace_back(left.right_bottom);
+  }
 
   auto left2right = right.center - left.center;
   auto width = cv::norm(left2right);

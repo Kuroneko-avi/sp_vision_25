@@ -69,6 +69,7 @@ struct Lightbar
   std::size_t id;
   Color color;
   cv::Point2f center, top, bottom, top2bottom;
+  cv::Point2f left_top, right_top, right_bottom, left_bottom;
   std::vector<cv::Point2f> points;
   double angle, angle_error, length, width, ratio;
   cv::RotatedRect rotated_rect;

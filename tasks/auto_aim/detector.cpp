@@ -192,16 +192,23 @@ bool Detector::detect(Armor & armor, const cv::Mat & bgr_img)
   float min_distance_tl_bl = std::numeric_limits<float>::max();
   float min_distance_br_tr = std::numeric_limits<float>::max();
   for (auto & lightbar : lightbars) {
-    float distance_tl_bl =
-      cv::norm(tl - (lightbar.top + cv::Point2f(boundingBox.x, boundingBox.y))) +
-      cv::norm(bl - (lightbar.bottom + cv::Point2f(boundingBox.x, boundingBox.y)));
+    const cv::Point2f offset(boundingBox.x, boundingBox.y);
+    const auto left_top = lightbar.left_top + offset;
+    const auto left_bottom = lightbar.left_bottom + offset;
+    const auto right_top = lightbar.right_top + offset;
+    const auto right_bottom = lightbar.right_bottom + offset;
+
+    float distance_tl_bl = std::min(
+      cv::norm(tl - left_top) + cv::norm(bl - left_bottom),
+      cv::norm(tl - right_top) + cv::norm(bl - right_bottom));
     if (distance_tl_bl < min_distance_tl_bl) {
       min_distance_tl_bl = distance_tl_bl;
       closest_left_lightbar = &lightbar;
     }
-    float distance_br_tr =
-      cv::norm(br - (lightbar.bottom + cv::Point2f(boundingBox.x, boundingBox.y))) +
-      cv::norm(tr - (lightbar.top + cv::Point2f(boundingBox.x, boundingBox.y)));
+
+    float distance_br_tr = std::min(
+      cv::norm(tr - left_top) + cv::norm(br - left_bottom),
+      cv::norm(tr - right_top) + cv::norm(br - right_bottom));
     if (distance_br_tr < min_distance_br_tr) {
       min_distance_br_tr = distance_br_tr;
       closest_right_lightbar = &lightbar;
@@ -219,11 +226,21 @@ bool Detector::detect(Armor & armor, const cv::Mat & bgr_img)
   if (
     closest_left_lightbar && closest_right_lightbar &&
     min_distance_br_tr + min_distance_tl_bl < 15) {
+    const bool use_left_edges = closest_left_lightbar->width < closest_right_lightbar->width;
+    const cv::Point2f offset(boundingBox.x, boundingBox.y);
+
     // 将四个点从armor_roi坐标系转换到原始图像坐标系
-    armor.points[0] = closest_left_lightbar->top + cv::Point2f(boundingBox.x, boundingBox.y);
-    armor.points[1] = closest_right_lightbar->top + cv::Point2f(boundingBox.x, boundingBox.y);
-    armor.points[2] = closest_right_lightbar->bottom + cv::Point2f(boundingBox.x, boundingBox.y);
-    armor.points[3] = closest_left_lightbar->bottom + cv::Point2f(boundingBox.x, boundingBox.y);
+    if (use_left_edges) {
+      armor.points[0] = closest_left_lightbar->left_top + offset;
+      armor.points[1] = closest_right_lightbar->left_top + offset;
+      armor.points[2] = closest_right_lightbar->left_bottom + offset;
+      armor.points[3] = closest_left_lightbar->left_bottom + offset;
+    } else {
+      armor.points[0] = closest_left_lightbar->right_top + offset;
+      armor.points[1] = closest_right_lightbar->right_top + offset;
+      armor.points[2] = closest_right_lightbar->right_bottom + offset;
+      armor.points[3] = closest_left_lightbar->right_bottom + offset;
+    }
     return true;
   }
 
