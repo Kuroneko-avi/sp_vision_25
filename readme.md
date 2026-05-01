@@ -52,6 +52,8 @@ IMU型号：使用C板内置BMI088作为IMU\
 通信方式：USB2CAN（旧）、MicroUSB虚拟串口（新）\
 辅助工具：NoMachine（远程桌面）、PlotJuggler（绘制曲线图）
 
+开发约定：除兼容旧链路的历史代码外，新代码中的云台姿态四元数统一通过 `io::Gimbal` 接收，不再通过 `io::CBoard` 或 CAN 链路接收。
+
 ### 3.2 编译方式
 1. 安装依赖项：
    - [MindVision SDK](https://mindvision.com.cn/category/software/sdk-installation-package/)或[HikRobot SDK](https://www.hikrobotics.com/cn2/source/support/software/MVS_STD_GML_V2.1.2_231116.zip)

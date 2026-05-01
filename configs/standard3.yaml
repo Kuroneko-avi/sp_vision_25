@@ -21,7 +21,7 @@ roi:
 use_roi: false
 
 #####-----传统方法参数-----#####
-threshold: 150
+threshold: 90
 max_angle_error: 45 # degree
 min_lightbar_ratio: 1.5
 max_lightbar_ratio: 20
@@ -52,7 +52,7 @@ judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 camera_name: "hikrobot"
-exposure_ms: 2.5
+exposure_ms: 4.5
 gain: 16.9
 vid_pid: "2bdf:0001"
 
