@@ -228,6 +228,8 @@ bool Detector::detect(Armor & armor, const cv::Mat & bgr_img)
     min_distance_br_tr + min_distance_tl_bl < 15) {
     const bool use_left_edges = closest_left_lightbar->width < closest_right_lightbar->width;
     const cv::Point2f offset(boundingBox.x, boundingBox.y);
+    armor.point_layout =
+      use_left_edges ? ArmorPointLayout::left_edge_pair : ArmorPointLayout::right_edge_pair;
 
     // 将四个点从armor_roi坐标系转换到原始图像坐标系
     if (use_left_edges) {
