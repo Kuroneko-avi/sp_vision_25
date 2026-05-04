@@ -28,22 +28,23 @@
 using namespace std::chrono_literals;
 
 const std::string keys =
-  "{help h usage ? |                        | 输出命令行参数说明}"
-  "{dashboard      |                        | 启用 MQTT Dashboard}"
+  "{help h usage ? |                        | output command line help }"
+  "{dashboard      |                        | enable MQTT Dashboard}"
   "{robot-id       | myrobot                | MQTT Dashboard robot id}"
   "{mqtt-host      | tcp://127.0.0.1:1883   | MQTT broker URI}"
-  "{@config-path   | configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
+  "{@config-path   | configs/standard3.yaml | yaml config path }"
+  "{imu-delay-ms   | 6.0                    | IMU delay in milliseconds }";
 
 int main(int argc, char * argv[])
 {
   tools::Exiter exiter;
-  tools::Plotter plotter;
 
   auto normalized_args = tools::dashboard::cli::normalize_cli_args(argc, argv);
   auto normalized_argv = tools::dashboard::cli::make_cli_argv(normalized_args);
   cv::CommandLineParser cli(
     static_cast<int>(normalized_argv.size()), normalized_argv.data(), keys);
   auto config_path = cli.get<std::string>(0);
+  auto imu_delay_ms = cli.get<double>("imu-delay-ms");
   if (cli.has("help") || config_path.empty()) {
     cli.printMessage();
     return 0;
@@ -51,6 +52,7 @@ int main(int argc, char * argv[])
   const auto dashboard_config = tools::dashboard::load_dashboard_config(
     config_path,
     tools::dashboard::cli::make_dashboard_overrides(normalized_args, cli.has("dashboard")));
+  auto plotter = tools::Plotter::from_config(config_path);
 
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
@@ -110,16 +112,11 @@ int main(int argc, char * argv[])
       data["fired"] = fired ? 1 : 0;
 
       if (target.has_value()) {
-        data["target_z"] = target->ekf_x()[4];   //z
-        data["target_vz"] = target->ekf_x()[5];  //vz
+        data["target_z"] = target->ekf_x()[4];
+        data["target_vz"] = target->ekf_x()[5];
       }
 
-      if (target.has_value()) {
-        data["w"] = target->ekf_x()[7];
-      } else {
-        data["w"] = 0.0;
-      }
-
+      data["w"] = target.has_value() ? target->ekf_x()[7] : 0.0;
       plotter.plot(data);
       dashboard.push_data(data);
 
@@ -129,13 +126,14 @@ int main(int argc, char * argv[])
 
   cv::Mat img;
   std::chrono::steady_clock::time_point t;
+  auto imu_delay = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+    std::chrono::duration<double, std::milli>(imu_delay_ms));
 
   while (!exiter.exit()) {
     dashboard.handle_commands();
 
-    Eigen::Quaterniond q;
     camera.read(img, t);
-    q = gimbal.q(t-std::chrono::milliseconds(6));
+    Eigen::Quaterniond q = gimbal.q(t - imu_delay);
 
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
@@ -146,8 +144,8 @@ int main(int argc, char * argv[])
       target_queue.push(std::nullopt);
 
     nlohmann::json data;
-    // 装甲板原始观测数据
     data["armor_num"] = armors.size();
+    data["imu_delay_ms"] = imu_delay_ms;
     if (!armors.empty()) {
       const auto & armor = armors.front();
       data["armor_x"] = armor.xyz_in_world[0];
@@ -164,7 +162,6 @@ int main(int argc, char * argv[])
     if (!targets.empty()) {
       auto target = targets.front();
 
-      // 当前帧target更新后
       std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
       for (const Eigen::Vector4d & xyza : armor_xyza_list) {
         auto image_points =
@@ -178,7 +175,8 @@ int main(int argc, char * argv[])
       tools::draw_points(img, image_points, {0, 0, 255});
     }
 
-    cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+    tools::draw_text(img, fmt::format("imu delay {:.2f} ms", imu_delay_ms), cv::Point(30, 40));
+    cv::resize(img, img, {}, 0.5, 0.5);
     cv::imshow("reprojection", img);
     auto key = cv::waitKey(1);
     if (key == 'q') break;
