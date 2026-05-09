@@ -20,7 +20,7 @@ const std::string keys =
   "{display d      | true                    | display debug window}"
   "{start-index s  | 0                       | first frame index}"
   "{end-index e    | 0                       | last frame index, 0 means run to end}"
-  "{@video-path    | assets/outpost1.avi     | input video path}";
+  "{@video-path    | assets/outpost3.avi     | input video path}";
 
 struct VideoMetadata
 {

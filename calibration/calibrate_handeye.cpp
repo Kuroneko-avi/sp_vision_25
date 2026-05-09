@@ -2,9 +2,12 @@
 #include <yaml-cpp/yaml.h>
 
 #include <Eigen/Dense>  // 必须在opencv2/core/eigen.hpp上面
+#include <filesystem>
 #include <fstream>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
+#include <optional>
+#include <stdexcept>
 
 #include "tools/img_tools.hpp"
 #include "tools/math_tools.hpp"
@@ -14,23 +17,44 @@ const std::string keys =
   "{config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
   "{@input-folder  | assets/img_with_q        | 输入文件夹路径   }";
 
-std::vector<cv::Point3f> centers_3d(const cv::Size & pattern_size, const float center_distance)
+namespace fs = std::filesystem;
+
+std::vector<cv::Point3f> corners_3d(const cv::Size & pattern_size, const float square_size)
 {
-  std::vector<cv::Point3f> centers_3d;
+  std::vector<cv::Point3f> pts;
+  pts.reserve(pattern_size.width * pattern_size.height);
 
   for (int i = 0; i < pattern_size.height; i++)
     for (int j = 0; j < pattern_size.width; j++)
-      centers_3d.push_back({j * center_distance, i * center_distance, 0});
+      pts.push_back({j * square_size, i * square_size, 0.0f});
 
-  return centers_3d;
+  return pts;
 }
 
-Eigen::Quaterniond read_q(const std::string & q_path)
+void ensure_input_folder_exists(const std::string & input_folder, const std::string & tool_name)
+{
+  fs::path input_path(input_folder);
+  if (!fs::exists(input_path)) {
+    throw std::runtime_error(fmt::format(
+      "{}: input folder '{}' does not exist. The default folder is gitignored, so capture data "
+      "first with './build/capture configs/calibration.yaml -o {}' or pass an existing folder.",
+      tool_name, input_folder, input_folder));
+  }
+  if (!fs::is_directory(input_path)) {
+    throw std::runtime_error(
+      fmt::format("{}: input path '{}' is not a directory.", tool_name, input_folder));
+  }
+}
+
+std::optional<Eigen::Quaterniond> read_q(const std::string & q_path)
 {
   std::ifstream q_file(q_path);
-  double w, x, y, z;
-  q_file >> w >> x >> y >> z;
-  return {w, x, y, z};
+  double w = 0;
+  double x = 0;
+  double y = 0;
+  double z = 0;
+  if (!q_file.is_open() || !(q_file >> w >> x >> y >> z)) return std::nullopt;
+  return Eigen::Quaterniond(w, x, y, z);
 }
 
 void load(
@@ -39,6 +63,8 @@ void load(
   std::vector<cv::Mat> & t_gimbal2world_list, std::vector<cv::Mat> & rvecs,
   std::vector<cv::Mat> & tvecs)
 {
+  ensure_input_folder_exists(input_folder, "calibrate_handeye");
+
   // 读取yaml参数
   auto yaml = YAML::LoadFile(config_path);
   auto pattern_cols = yaml["pattern_cols"].as<int>();
@@ -55,14 +81,30 @@ void load(
 
   for (int i = 1; true; i++) {
     // 读取图片和对应四元数
-    auto img_path = fmt::format("{}/{}.jpg", input_folder, i);
-    auto q_path = fmt::format("{}/{}.txt", input_folder, i);
-    auto img = cv::imread(img_path);
-    Eigen::Quaterniond q = read_q(q_path);
-    if (img.empty()) break;
+    auto img_path = fs::path(input_folder) / fmt::format("{}.jpg", i);
+    auto q_path = fs::path(input_folder) / fmt::format("{}.txt", i);
+    if (!fs::exists(img_path)) break;
+    if (!fs::exists(q_path)) {
+      throw std::runtime_error(fmt::format(
+        "Missing quaternion file '{}' for image '{}'. Expected capture output pairs named "
+        "1.jpg/1.txt, 2.jpg/2.txt, ...",
+        q_path.string(), img_path.string()));
+    }
+
+    auto img = cv::imread(img_path.string());
+    if (img.empty()) {
+      throw std::runtime_error(fmt::format("Failed to decode image '{}'.", img_path.string()));
+    }
+
+    auto q = read_q(q_path.string());
+    if (!q.has_value()) {
+      throw std::runtime_error(fmt::format(
+        "Failed to parse quaternion file '{}'. Expected four numbers in w x y z order.",
+        q_path.string()));
+    }
 
     // 计算云台的欧拉角
-    Eigen::Matrix3d R_imubody2imuabs = q.toRotationMatrix();
+    Eigen::Matrix3d R_imubody2imuabs = q->toRotationMatrix();
     Eigen::Matrix3d R_gimbal2world =
       R_gimbal2imubody.transpose() * R_imubody2imuabs * R_gimbal2imubody;
     Eigen::Vector3d ypr = tools::eulers(R_gimbal2world, 2, 1, 0) * 57.3;  // degree
@@ -74,17 +116,30 @@ void load(
     tools::draw_text(drawing, fmt::format("roll  {:.2f}", ypr[2]), {40, 120}, {0, 0, 255});
 
     // 识别标定板
-    std::vector<cv::Point2f> centers_2d;
-    auto success = cv::findCirclesGrid(img, pattern_size, centers_2d);  // 默认是对称圆点图案
+    std::vector<cv::Point2f> corners_2d;
+    int flags = cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE;
+    bool success = cv::findChessboardCorners(img, pattern_size, corners_2d, flags);
+
+    if (success) {
+      cv::Mat gray;
+      if (img.channels() == 3)
+        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+      else
+        gray = img;
+
+      cv::cornerSubPix(
+        gray, corners_2d, cv::Size(11, 11), cv::Size(-1, -1),
+        cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 30, 0.01));
+    }
 
     // 显示识别结果
-    cv::drawChessboardCorners(drawing, pattern_size, centers_2d, success);
+    cv::drawChessboardCorners(drawing, pattern_size, corners_2d, success);
     cv::resize(drawing, drawing, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     cv::imshow("Press any to continue", drawing);
     cv::waitKey(0);
 
     // 输出识别结果
-    fmt::print("[{}] {}\n", success ? "success" : "failure", img_path);
+    fmt::print("[{}] {}\n", success ? "success" : "failure", img_path.string());
     if (!success) continue;
 
     // 计算所需的数据
@@ -92,9 +147,9 @@ void load(
     cv::Mat R_gimbal2world_cv;
     cv::eigen2cv(R_gimbal2world, R_gimbal2world_cv);
     cv::Mat rvec, tvec;
-    auto centers_3d_ = centers_3d(pattern_size, center_distance_mm);
+    auto corners_3d_ = corners_3d(pattern_size, static_cast<float>(center_distance_mm));
     cv::solvePnP(
-      centers_3d_, centers_2d, camera_matrix, distort_coeffs, rvec, tvec, false, cv::SOLVEPNP_IPPE);
+      corners_3d_, corners_2d, camera_matrix, distort_coeffs, rvec, tvec, false, cv::SOLVEPNP_IPPE);
 
     // 记录所需的数据
     R_gimbal2world_list.emplace_back(R_gimbal2world_cv);
@@ -133,36 +188,50 @@ void print_yaml(
 
 int main(int argc, char * argv[])
 {
-  // 读取命令行参数
-  cv::CommandLineParser cli(argc, argv, keys);
-  if (cli.has("help")) {
-    cli.printMessage();
+  try {
+    // 读取命令行参数
+    cv::CommandLineParser cli(argc, argv, keys);
+    if (cli.has("help")) {
+      cli.printMessage();
+      return 0;
+    }
+    auto input_folder = cli.get<std::string>(0);
+    auto config_path = cli.get<std::string>("config-path");
+
+    // 从输入文件夹中加载标定所需的数据
+    std::vector<double> R_gimbal2imubody_data;
+    std::vector<cv::Mat> R_gimbal2world_list, t_gimbal2world_list;
+    std::vector<cv::Mat> rvecs, tvecs;
+    load(
+      input_folder, config_path, R_gimbal2imubody_data, R_gimbal2world_list, t_gimbal2world_list,
+      rvecs, tvecs);
+
+    if (rvecs.size() < 3) {
+      throw std::runtime_error(fmt::format(
+        "calibrate_handeye needs at least 3 valid measurements, but only {} were loaded from "
+        "'{}'. Make sure the folder contains sequential 1.jpg/1.txt pairs and capture at least "
+        "15 views for a stable result.",
+        rvecs.size(), input_folder));
+    }
+
+    // 手眼标定
+    cv::Mat R_camera2gimbal, t_camera2gimbal;
+    cv::calibrateHandEye(
+      R_gimbal2world_list, t_gimbal2world_list, rvecs, tvecs, R_camera2gimbal, t_camera2gimbal);
+    t_camera2gimbal /= 1e3;  // mm to m
+
+    // 计算相机同理想情况的偏角
+    Eigen::Matrix3d R_camera2gimbal_eigen;
+    cv::cv2eigen(R_camera2gimbal, R_camera2gimbal_eigen);
+    Eigen::Matrix3d R_gimbal2ideal{{0, -1, 0}, {0, 0, -1}, {1, 0, 0}};
+    Eigen::Matrix3d R_camera2ideal = R_gimbal2ideal * R_camera2gimbal_eigen;
+    Eigen::Vector3d ypr = tools::eulers(R_camera2ideal, 1, 0, 2) * 57.3;  // degree
+
+    // 输出yaml
+    print_yaml(R_gimbal2imubody_data, R_camera2gimbal, t_camera2gimbal, ypr);
     return 0;
+  } catch (const std::exception & e) {
+    fmt::print(stderr, "Error: {}\n", e.what());
+    return 1;
   }
-  auto input_folder = cli.get<std::string>(0);
-  auto config_path = cli.get<std::string>("config-path");
-
-  // 从输入文件夹中加载标定所需的数据
-  std::vector<double> R_gimbal2imubody_data;
-  std::vector<cv::Mat> R_gimbal2world_list, t_gimbal2world_list;
-  std::vector<cv::Mat> rvecs, tvecs;
-  load(
-    input_folder, config_path, R_gimbal2imubody_data, R_gimbal2world_list, t_gimbal2world_list,
-    rvecs, tvecs);
-
-  // 手眼标定
-  cv::Mat R_camera2gimbal, t_camera2gimbal;
-  cv::calibrateHandEye(
-    R_gimbal2world_list, t_gimbal2world_list, rvecs, tvecs, R_camera2gimbal, t_camera2gimbal);
-  t_camera2gimbal /= 1e3;  // mm to m
-
-  // 计算相机同理想情况的偏角
-  Eigen::Matrix3d R_camera2gimbal_eigen;
-  cv::cv2eigen(R_camera2gimbal, R_camera2gimbal_eigen);
-  Eigen::Matrix3d R_gimbal2ideal{{0, -1, 0}, {0, 0, -1}, {1, 0, 0}};
-  Eigen::Matrix3d R_camera2ideal = R_gimbal2ideal * R_camera2gimbal_eigen;
-  Eigen::Vector3d ypr = tools::eulers(R_camera2ideal, 1, 0, 2) * 57.3;  // degree
-
-  // 输出yaml
-  print_yaml(R_gimbal2imubody_data, R_camera2gimbal, t_camera2gimbal, ypr);
 }

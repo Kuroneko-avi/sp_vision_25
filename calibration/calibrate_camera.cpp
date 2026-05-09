@@ -1,8 +1,10 @@
 #include <fmt/core.h>
 #include <yaml-cpp/yaml.h>
 
+#include <filesystem>
 #include <fstream>
 #include <opencv2/opencv.hpp>
+#include <stdexcept>
 
 #include "tools/img_tools.hpp"
 
@@ -10,6 +12,23 @@ const std::string keys =
   "{help h usage ? |                          | 输出命令行参数说明}"
   "{config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
   "{@input-folder  | assets/img_with_q        | 输入文件夹路径   }";
+
+namespace fs = std::filesystem;
+
+void ensure_input_folder_exists(const std::string & input_folder, const std::string & tool_name)
+{
+  fs::path input_path(input_folder);
+  if (!fs::exists(input_path)) {
+    throw std::runtime_error(fmt::format(
+      "{}: input folder '{}' does not exist. The default folder is gitignored, so capture data "
+      "first with './build/capture configs/calibration.yaml -o {}' or pass an existing folder.",
+      tool_name, input_folder, input_folder));
+  }
+  if (!fs::is_directory(input_path)) {
+    throw std::runtime_error(
+      fmt::format("{}: input path '{}' is not a directory.", tool_name, input_folder));
+  }
+}
 
 // 棋盘格内角点3D坐标（Z=0平面）
 // pattern_size: (cols, rows) = (每行内角点数, 每列内角点数)
@@ -32,6 +51,8 @@ void load(
   std::vector<std::vector<cv::Point3f>> & obj_points,
   std::vector<std::vector<cv::Point2f>> & img_points)
 {
+  ensure_input_folder_exists(input_folder, "calibrate_camera");
+
   // 读取yaml参数
   auto yaml = YAML::LoadFile(config_path);
   auto pattern_cols = yaml["pattern_cols"].as<int>();
@@ -41,9 +62,13 @@ void load(
 
   for (int i = 1; true; i++) {
     // 读取图片
-    auto img_path = fmt::format("{}/{}.jpg", input_folder, i);
-    auto img = cv::imread(img_path);
-    if (img.empty()) break;
+    auto img_path = fs::path(input_folder) / fmt::format("{}.jpg", i);
+    if (!fs::exists(img_path)) break;
+
+    auto img = cv::imread(img_path.string());
+    if (img.empty()) {
+      throw std::runtime_error(fmt::format("Failed to decode image '{}'.", img_path.string()));
+    }
 
     // 设置图片尺寸
     img_size = img.size();
@@ -74,7 +99,7 @@ void load(
     cv::waitKey(0);
 
     // 输出识别结果
-    fmt::print("[{}] {}\n", success ? "success" : "failure", img_path);
+    fmt::print("[{}] {}\n", success ? "success" : "failure", img_path.string());
     if (!success) continue;
 
     // 记录所需的数据
@@ -105,44 +130,57 @@ void print_yaml(const cv::Mat & camera_matrix, const cv::Mat & distort_coeffs, d
 
 int main(int argc, char * argv[])
 {
-  // 读取命令行参数
-  cv::CommandLineParser cli(argc, argv, keys);
-  if (cli.has("help")) {
-    cli.printMessage();
+  try {
+    // 读取命令行参数
+    cv::CommandLineParser cli(argc, argv, keys);
+    if (cli.has("help")) {
+      cli.printMessage();
+      return 0;
+    }
+    auto input_folder = cli.get<std::string>(0);
+    auto config_path = cli.get<std::string>("config-path");
+
+    // 从输入文件夹中加载标定所需的数据
+    cv::Size img_size;
+    std::vector<std::vector<cv::Point3f>> obj_points;
+    std::vector<std::vector<cv::Point2f>> img_points;
+    load(input_folder, config_path, img_size, obj_points, img_points);
+
+    if (img_points.size() < 3) {
+      throw std::runtime_error(fmt::format(
+        "calibrate_camera needs at least 3 valid chessboard images, but only {} were loaded from "
+        "'{}'. Capture more images from different angles and distances.",
+        img_points.size(), input_folder));
+    }
+
+    // 相机标定
+    cv::Mat camera_matrix, distort_coeffs;
+    std::vector<cv::Mat> rvecs, tvecs;
+    auto criteria = cv::TermCriteria(
+      cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 100, DBL_EPSILON);
+    cv::calibrateCamera(
+      obj_points, img_points, img_size, camera_matrix, distort_coeffs, rvecs, tvecs,
+      cv::CALIB_FIX_K3, criteria);
+
+    // 重投影误差
+    double error_sum = 0;
+    size_t total_points = 0;
+    for (size_t i = 0; i < obj_points.size(); i++) {
+      std::vector<cv::Point2f> reprojected_points;
+      cv::projectPoints(
+        obj_points[i], rvecs[i], tvecs[i], camera_matrix, distort_coeffs, reprojected_points);
+
+      total_points += reprojected_points.size();
+      for (size_t j = 0; j < reprojected_points.size(); j++)
+        error_sum += cv::norm(img_points[i][j] - reprojected_points[j]);
+    }
+    auto error = error_sum / total_points;
+
+    // 输出yaml
+    print_yaml(camera_matrix, distort_coeffs, error);
     return 0;
+  } catch (const std::exception & e) {
+    fmt::print(stderr, "Error: {}\n", e.what());
+    return 1;
   }
-  auto input_folder = cli.get<std::string>(0);
-  auto config_path = cli.get<std::string>("config-path");
-
-  // 从输入文件夹中加载标定所需的数据
-  cv::Size img_size;
-  std::vector<std::vector<cv::Point3f>> obj_points;
-  std::vector<std::vector<cv::Point2f>> img_points;
-  load(input_folder, config_path, img_size, obj_points, img_points);
-
-  // 相机标定
-  cv::Mat camera_matrix, distort_coeffs;
-  std::vector<cv::Mat> rvecs, tvecs;
-  auto criteria = cv::TermCriteria(
-    cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 100, DBL_EPSILON);
-  cv::calibrateCamera(
-    obj_points, img_points, img_size, camera_matrix, distort_coeffs, rvecs, tvecs, cv::CALIB_FIX_K3,
-    criteria);
-
-  // 重投影误差
-  double error_sum = 0;
-  size_t total_points = 0;
-  for (size_t i = 0; i < obj_points.size(); i++) {
-    std::vector<cv::Point2f> reprojected_points;
-    cv::projectPoints(
-      obj_points[i], rvecs[i], tvecs[i], camera_matrix, distort_coeffs, reprojected_points);
-
-    total_points += reprojected_points.size();
-    for (size_t j = 0; j < reprojected_points.size(); j++)
-      error_sum += cv::norm(img_points[i][j] - reprojected_points[j]);
-  }
-  auto error = error_sum / total_points;
-
-  // 输出yaml
-  print_yaml(camera_matrix, distort_coeffs, error);
 }

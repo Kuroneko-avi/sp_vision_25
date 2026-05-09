@@ -101,6 +101,10 @@
    - 检查相机是否对准标定板
    - 检查光照条件是否合适
    - 检查标定板是否在视野内
+   - 若报错包含 `assets/img_with_q/1.jpg` `can't open/read file` 或提示 `At least 3 measurements are needed`:
+     默认输入目录 `assets/img_with_q/` 被 `.gitignore` 忽略，新 clone 的仓库通常不存在该目录。先运行
+     `./build/capture configs/calibration.yaml -o assets/img_with_q`
+     采集图片与四元数对，或在标定命令后显式传入已有数据目录
 
 2. **标定计算失败**:
    - 检查标定板角点检测

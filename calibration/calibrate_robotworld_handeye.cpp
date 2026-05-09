@@ -2,9 +2,12 @@
 #include <yaml-cpp/yaml.h>
 
 #include <Eigen/Dense>  // 必须在opencv2/core/eigen.hpp上面
+#include <filesystem>
 #include <fstream>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
+#include <optional>
+#include <stdexcept>
 
 #include "tools/img_tools.hpp"
 #include "tools/math_tools.hpp"
@@ -13,6 +16,8 @@ const std::string keys =
   "{help h usage ? |                          | 输出命令行参数说明}"
   "{config-path c  | configs/calibration.yaml | yaml配置文件路径 }"
   "{@input-folder  | assets/img_with_q        | 输入文件夹路径   }";
+
+namespace fs = std::filesystem;
 
 // 棋盘格内角点3D坐标（单位：mm）
 // pattern_size = (cols, rows) = (每行内角点数, 每列内角点数)
@@ -34,12 +39,30 @@ std::vector<cv::Point3f> corners_3d(const cv::Size & pattern_size, float square_
   return pts;
 }
 
-Eigen::Quaterniond read_q(const std::string & q_path)
+void ensure_input_folder_exists(const std::string & input_folder, const std::string & tool_name)
+{
+  fs::path input_path(input_folder);
+  if (!fs::exists(input_path)) {
+    throw std::runtime_error(fmt::format(
+      "{}: input folder '{}' does not exist. The default folder is gitignored, so capture data "
+      "first with './build/capture configs/calibration.yaml -o {}' or pass an existing folder.",
+      tool_name, input_folder, input_folder));
+  }
+  if (!fs::is_directory(input_path)) {
+    throw std::runtime_error(
+      fmt::format("{}: input path '{}' is not a directory.", tool_name, input_folder));
+  }
+}
+
+std::optional<Eigen::Quaterniond> read_q(const std::string & q_path)
 {
   std::ifstream q_file(q_path);
-  double w, x, y, z;
-  q_file >> w >> x >> y >> z;
-  return {w, x, y, z};
+  double w = 0;
+  double x = 0;
+  double y = 0;
+  double z = 0;
+  if (!q_file.is_open() || !(q_file >> w >> x >> y >> z)) return std::nullopt;
+  return Eigen::Quaterniond(w, x, y, z);
 }
 
 void load(
@@ -48,6 +71,8 @@ void load(
   std::vector<cv::Mat> & t_world2gimbal_list, std::vector<cv::Mat> & rvecs,
   std::vector<cv::Mat> & tvecs)
 {
+  ensure_input_folder_exists(input_folder, "calibrate_robotworld_handeye");
+
   // 读取yaml参数
   auto yaml = YAML::LoadFile(config_path);
   auto pattern_cols = yaml["pattern_cols"].as<int>();
@@ -64,14 +89,30 @@ void load(
 
   for (int i = 1; true; i++) {
     // 读取图片和对应四元数
-    auto img_path = fmt::format("{}/{}.jpg", input_folder, i);
-    auto q_path = fmt::format("{}/{}.txt", input_folder, i);
-    auto img = cv::imread(img_path);
-    Eigen::Quaterniond q = read_q(q_path);
-    if (img.empty()) break;
+    auto img_path = fs::path(input_folder) / fmt::format("{}.jpg", i);
+    auto q_path = fs::path(input_folder) / fmt::format("{}.txt", i);
+    if (!fs::exists(img_path)) break;
+    if (!fs::exists(q_path)) {
+      throw std::runtime_error(fmt::format(
+        "Missing quaternion file '{}' for image '{}'. Expected capture output pairs named "
+        "1.jpg/1.txt, 2.jpg/2.txt, ...",
+        q_path.string(), img_path.string()));
+    }
+
+    auto img = cv::imread(img_path.string());
+    if (img.empty()) {
+      throw std::runtime_error(fmt::format("Failed to decode image '{}'.", img_path.string()));
+    }
+
+    auto q = read_q(q_path.string());
+    if (!q.has_value()) {
+      throw std::runtime_error(fmt::format(
+        "Failed to parse quaternion file '{}'. Expected four numbers in w x y z order.",
+        q_path.string()));
+    }
 
     // 计算云台的欧拉角
-    Eigen::Matrix3d R_imubody2imuabs = q.toRotationMatrix();
+    Eigen::Matrix3d R_imubody2imuabs = q->toRotationMatrix();
     Eigen::Matrix3d R_gimbal2world =
       R_gimbal2imubody.transpose() * R_imubody2imuabs * R_gimbal2imubody;
     Eigen::Vector3d ypr = tools::eulers(R_gimbal2world, 2, 1, 0) * 57.3;  // degree
@@ -107,7 +148,7 @@ void load(
     cv::waitKey(0);
 
     // 输出识别结果
-    fmt::print("[{}] {}\n", success ? "success" : "failure", img_path);
+    fmt::print("[{}] {}\n", success ? "success" : "failure", img_path.string());
     if (!success) continue;
 
     // 计算所需的数据
@@ -166,50 +207,64 @@ void print_yaml(
 
 int main(int argc, char * argv[])
 {
-  cv::CommandLineParser cli(argc, argv, keys);
-  if (cli.has("help")) {
-    cli.printMessage();
+  try {
+    cv::CommandLineParser cli(argc, argv, keys);
+    if (cli.has("help")) {
+      cli.printMessage();
+      return 0;
+    }
+    auto input_folder = cli.get<std::string>(0);
+    auto config_path = cli.get<std::string>("config-path");
+
+    std::vector<double> R_gimbal2imubody_data;
+    std::vector<cv::Mat> R_world2gimbal_list, t_world2gimbal_list;
+    std::vector<cv::Mat> rvecs, tvecs;
+    load(
+      input_folder, config_path, R_gimbal2imubody_data, R_world2gimbal_list, t_world2gimbal_list,
+      rvecs, tvecs);
+
+    if (rvecs.size() < 3) {
+      throw std::runtime_error(fmt::format(
+        "calibrate_robotworld_handeye needs at least 3 valid measurements, but only {} were "
+        "loaded from '{}'. Make sure the folder contains sequential 1.jpg/1.txt pairs and "
+        "capture at least 15 views for a stable result.",
+        rvecs.size(), input_folder));
+    }
+
+    cv::Mat R_gimbal2camera, t_gimbal2camera;
+    cv::Mat R_world2board, t_world2board;
+    cv::calibrateRobotWorldHandEye(
+      rvecs, tvecs, R_world2gimbal_list, t_world2gimbal_list, R_world2board, t_world2board,
+      R_gimbal2camera, t_gimbal2camera);
+    t_gimbal2camera /= 1e3;
+    t_world2board /= 1e3;
+
+    cv::Mat R_camera2gimbal, t_camera2gimbal;
+    cv::Mat R_board2world, t_board2world;
+    cv::transpose(R_gimbal2camera, R_camera2gimbal);
+    cv::transpose(R_world2board, R_board2world);
+    t_camera2gimbal = -R_camera2gimbal * t_gimbal2camera;
+    t_board2world = -R_board2world * t_world2board;
+
+    Eigen::Matrix3d R_camera2gimbal_eigen;
+    cv::cv2eigen(R_camera2gimbal, R_camera2gimbal_eigen);
+    Eigen::Matrix3d R_gimbal2ideal{{0, -1, 0}, {0, 0, -1}, {1, 0, 0}};
+    Eigen::Matrix3d R_camera2ideal = R_gimbal2ideal * R_camera2gimbal_eigen;
+    Eigen::Vector3d camera_ypr = tools::eulers(R_camera2ideal, 1, 0, 2) * 57.3;
+
+    auto x = t_board2world.at<double>(0);
+    auto y = t_board2world.at<double>(1);
+    auto distance = std::sqrt(x * x + y * y);
+
+    Eigen::Matrix3d R_board2world_eigen;
+    cv::cv2eigen(R_board2world, R_board2world_eigen);
+    Eigen::Vector3d board_ypr = tools::eulers(R_board2world_eigen, 2, 1, 0) * 57.3;
+
+    print_yaml(
+      R_gimbal2imubody_data, R_camera2gimbal, t_camera2gimbal, camera_ypr, distance, board_ypr);
     return 0;
+  } catch (const std::exception & e) {
+    fmt::print(stderr, "Error: {}\n", e.what());
+    return 1;
   }
-  auto input_folder = cli.get<std::string>(0);
-  auto config_path = cli.get<std::string>("config-path");
-
-  std::vector<double> R_gimbal2imubody_data;
-  std::vector<cv::Mat> R_world2gimbal_list, t_world2gimbal_list;
-  std::vector<cv::Mat> rvecs, tvecs;
-  load(
-    input_folder, config_path, R_gimbal2imubody_data, R_world2gimbal_list, t_world2gimbal_list,
-    rvecs, tvecs);
-
-  cv::Mat R_gimbal2camera, t_gimbal2camera;
-  cv::Mat R_world2board, t_world2board;
-  cv::calibrateRobotWorldHandEye(
-    rvecs, tvecs, R_world2gimbal_list, t_world2gimbal_list, R_world2board, t_world2board,
-    R_gimbal2camera, t_gimbal2camera);
-  t_gimbal2camera /= 1e3;
-  t_world2board /= 1e3;
-
-  cv::Mat R_camera2gimbal, t_camera2gimbal;
-  cv::Mat R_board2world, t_board2world;
-  cv::transpose(R_gimbal2camera, R_camera2gimbal);
-  cv::transpose(R_world2board, R_board2world);
-  t_camera2gimbal = -R_camera2gimbal * t_gimbal2camera;
-  t_board2world = -R_board2world * t_world2board;
-
-  Eigen::Matrix3d R_camera2gimbal_eigen;
-  cv::cv2eigen(R_camera2gimbal, R_camera2gimbal_eigen);
-  Eigen::Matrix3d R_gimbal2ideal{{0, -1, 0}, {0, 0, -1}, {1, 0, 0}};
-  Eigen::Matrix3d R_camera2ideal = R_gimbal2ideal * R_camera2gimbal_eigen;
-  Eigen::Vector3d camera_ypr = tools::eulers(R_camera2ideal, 1, 0, 2) * 57.3;
-
-  auto x = t_board2world.at<double>(0);
-  auto y = t_board2world.at<double>(1);
-  auto distance = std::sqrt(x * x + y * y);
-
-  Eigen::Matrix3d R_board2world_eigen;
-  cv::cv2eigen(R_board2world, R_board2world_eigen);
-  Eigen::Vector3d board_ypr = tools::eulers(R_board2world_eigen, 2, 1, 0) * 57.3;
-
-  print_yaml(
-    R_gimbal2imubody_data, R_camera2gimbal, t_camera2gimbal, camera_ypr, distance, board_ypr);
 }
