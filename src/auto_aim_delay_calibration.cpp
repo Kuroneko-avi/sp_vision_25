@@ -30,7 +30,7 @@ using Clock = std::chrono::steady_clock;
 
 const std::string keys =
   "{help h usage ? |                        | output command line help }"
-  "{@config-path   | configs/standard3.yaml | yaml config path }"
+  "{@config-path   | configs/infantry.yaml | yaml config path }"
   "{freq-hz        | 0.6                    | yaw sine frequency in Hz }"
   "{amp-deg        | 7.0                    | yaw sine amplitude in degrees }"
   "{delay-min-ms   | 0.0                   | minimum IMU delay in milliseconds }"

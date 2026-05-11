@@ -22,7 +22,7 @@ namespace
 {
 using ParamSpec = DashboardParams::ParamSpec;
 
-constexpr char STANDARD3_CONFIG_PATH[] = "configs/standard3.yaml";
+constexpr char STANDARD3_CONFIG_PATH[] = "configs/infantry.yaml";
 
 DashboardParamResult make_result(
   bool ok, DashboardParamStatus status, const std::string & key, const std::string & message,

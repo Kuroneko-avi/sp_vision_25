@@ -16,7 +16,7 @@ namespace
 {
 const std::string keys =
   "{help h usage ? |                         | show help message}"
-  "{config-path c  | configs/standard3.yaml  | path to yaml config}"
+  "{config-path c  | configs/infantry.yaml  | path to yaml config}"
   "{display d      | true                    | display debug window}"
   "{start-index s  | 0                       | first frame index}"
   "{end-index e    | 0                       | last frame index, 0 means run to end}"
