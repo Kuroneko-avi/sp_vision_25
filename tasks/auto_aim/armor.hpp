@@ -48,13 +48,6 @@ enum ArmorPriority
   fifth
 };
 
-enum ArmorPointLayout
-{
-  outer,
-  left_edge_pair,
-  right_edge_pair
-};
-
 // clang-format off
 const std::vector<std::tuple<Color, ArmorName, ArmorType>> armor_properties = {
   {blue, sentry, small},     {red, sentry, small},     {extinguish, sentry, small},
@@ -76,7 +69,6 @@ struct Lightbar
   std::size_t id;
   Color color;
   cv::Point2f center, top, bottom, top2bottom;
-  cv::Point2f left_top, right_top, right_bottom, left_bottom;
   std::vector<cv::Point2f> points;
   double angle, angle_error, length, width, ratio;
   cv::RotatedRect rotated_rect;
@@ -92,7 +84,6 @@ struct Armor
   cv::Point2f center;       // 不是对角线交点，不能作为实际中心！
   cv::Point2f center_norm;  // 归一化坐标
   std::vector<cv::Point2f> points;
-  ArmorPointLayout point_layout = ArmorPointLayout::outer;
 
   double ratio;              // 两灯条的中点连线与长灯条的长度之比
   double side_ratio;         // 长灯条与短灯条的长度之比

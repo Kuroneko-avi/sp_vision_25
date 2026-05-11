@@ -192,23 +192,16 @@ bool Detector::detect(Armor & armor, const cv::Mat & bgr_img)
   float min_distance_tl_bl = std::numeric_limits<float>::max();
   float min_distance_br_tr = std::numeric_limits<float>::max();
   for (auto & lightbar : lightbars) {
-    const cv::Point2f offset(boundingBox.x, boundingBox.y);
-    const auto left_top = lightbar.left_top + offset;
-    const auto left_bottom = lightbar.left_bottom + offset;
-    const auto right_top = lightbar.right_top + offset;
-    const auto right_bottom = lightbar.right_bottom + offset;
-
-    float distance_tl_bl = std::min(
-      cv::norm(tl - left_top) + cv::norm(bl - left_bottom),
-      cv::norm(tl - right_top) + cv::norm(bl - right_bottom));
+    float distance_tl_bl =
+      cv::norm(tl - (lightbar.top + cv::Point2f(boundingBox.x, boundingBox.y))) +
+      cv::norm(bl - (lightbar.bottom + cv::Point2f(boundingBox.x, boundingBox.y)));
     if (distance_tl_bl < min_distance_tl_bl) {
       min_distance_tl_bl = distance_tl_bl;
       closest_left_lightbar = &lightbar;
     }
-
-    float distance_br_tr = std::min(
-      cv::norm(tr - left_top) + cv::norm(br - left_bottom),
-      cv::norm(tr - right_top) + cv::norm(br - right_bottom));
+    float distance_br_tr =
+      cv::norm(br - (lightbar.bottom + cv::Point2f(boundingBox.x, boundingBox.y))) +
+      cv::norm(tr - (lightbar.top + cv::Point2f(boundingBox.x, boundingBox.y)));
     if (distance_br_tr < min_distance_br_tr) {
       min_distance_br_tr = distance_br_tr;
       closest_right_lightbar = &lightbar;
@@ -226,23 +219,11 @@ bool Detector::detect(Armor & armor, const cv::Mat & bgr_img)
   if (
     closest_left_lightbar && closest_right_lightbar &&
     min_distance_br_tr + min_distance_tl_bl < 15) {
-    const bool use_left_edges = closest_left_lightbar->width < closest_right_lightbar->width;
-    const cv::Point2f offset(boundingBox.x, boundingBox.y);
-    armor.point_layout =
-      use_left_edges ? ArmorPointLayout::left_edge_pair : ArmorPointLayout::right_edge_pair;
-
     // 将四个点从armor_roi坐标系转换到原始图像坐标系
-    if (use_left_edges) {
-      armor.points[0] = closest_left_lightbar->left_top + offset;
-      armor.points[1] = closest_right_lightbar->left_top + offset;
-      armor.points[2] = closest_right_lightbar->left_bottom + offset;
-      armor.points[3] = closest_left_lightbar->left_bottom + offset;
-    } else {
-      armor.points[0] = closest_left_lightbar->right_top + offset;
-      armor.points[1] = closest_right_lightbar->right_top + offset;
-      armor.points[2] = closest_right_lightbar->right_bottom + offset;
-      armor.points[3] = closest_left_lightbar->right_bottom + offset;
-    }
+    armor.points[0] = closest_left_lightbar->top + cv::Point2f(boundingBox.x, boundingBox.y);
+    armor.points[1] = closest_right_lightbar->top + cv::Point2f(boundingBox.x, boundingBox.y);
+    armor.points[2] = closest_right_lightbar->bottom + cv::Point2f(boundingBox.x, boundingBox.y);
+    armor.points[3] = closest_left_lightbar->bottom + cv::Point2f(boundingBox.x, boundingBox.y);
     return true;
   }
 
@@ -281,8 +262,9 @@ bool Detector::check_name(const Armor & armor) const
 
 bool Detector::check_type(const Armor & armor) const
 {
-  auto name_ok = armor.type == ArmorType::big ? (armor.name == ArmorName::one)
-                                              : (armor.name != ArmorName::one);
+  auto name_ok = armor.type == ArmorType::small
+                   ? (armor.name != ArmorName::one && armor.name != ArmorName::base)
+                   : (armor.name == ArmorName::one || armor.name == ArmorName::base);
 
   // 保存异常的图案，用于分类器的迭代
   if (!name_ok) {
@@ -328,8 +310,31 @@ cv::Mat Detector::get_pattern(const cv::Mat & bgr_img, const Armor & armor) cons
 
 ArmorType Detector::get_type(const Armor & armor)
 {
-  // 25 赛季传统识别按编号直接判定大小装甲板：只有 1 号是大装甲板，其余全部视为小装甲板。
-  return armor.name == ArmorName::one ? ArmorType::big : ArmorType::small;
+  /// 优先根据当前armor.ratio判断
+  /// TODO: 25赛季是否还需要根据比例判断大小装甲？能否根据图案直接判断？
+
+  if (armor.ratio > 3.0) {
+    // tools::logger()->debug(
+    //   "[Detector] get armor type by ratio: BIG {} {:.2f}", ARMOR_NAMES[armor.name], armor.ratio);
+    return ArmorType::big;
+  }
+
+  if (armor.ratio < 2.5) {
+    // tools::logger()->debug(
+    //   "[Detector] get armor type by ratio: SMALL {} {:.2f}", ARMOR_NAMES[armor.name], armor.ratio);
+    return ArmorType::small;
+  }
+
+  // tools::logger()->debug("[Detector] get armor type by name: {}", ARMOR_NAMES[armor.name]);
+
+  // 英雄、基地只能是大装甲板
+  if (armor.name == ArmorName::one || armor.name == ArmorName::base) {
+    return ArmorType::big;
+  }
+
+  // 其他所有（工程、哨兵、前哨站、步兵）都是小装甲板
+  /// TODO: 基地顶装甲是小装甲板
+  return ArmorType::small;
 }
 
 cv::Point2f Detector::get_center_norm(const cv::Mat & bgr_img, const cv::Point2f & center) const

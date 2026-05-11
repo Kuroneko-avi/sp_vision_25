@@ -22,7 +22,6 @@ public:
 
   std::vector<cv::Point2f> reproject_armor(
     const Eigen::Vector3d & xyz_in_world, double yaw, ArmorType type, ArmorName name) const;
-  std::vector<cv::Point2f> reproject_armor(const Armor & armor) const;
 
   double outpost_reprojection_error(Armor armor, const double & pitch);
 
@@ -36,10 +35,6 @@ private:
   Eigen::Vector3d t_camera2gimbal_;
   Eigen::Matrix3d R_gimbal2world_;
 
-  std::vector<cv::Point3f> armor_object_points(ArmorType type, ArmorPointLayout layout) const;
-  std::vector<cv::Point2f> reproject_object_points(
-    const Eigen::Vector3d & xyz_in_world, double yaw, ArmorName name,
-    const std::vector<cv::Point3f> & object_points) const;
   void optimize_yaw(Armor & armor) const;
   void solve_ippe(Armor & armor, const std::vector<cv::Point3f> & object_points) const;
   void update_pose(Armor & armor, const cv::Vec3d & rvec, const cv::Vec3d & tvec) const;

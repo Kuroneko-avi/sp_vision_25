@@ -9,20 +9,20 @@
 
 namespace auto_aim
 {
-namespace
-{
-// 实测尺寸，按 mm 记录并转换到 m。
-constexpr double BIG_ARMOR_OUTER_WIDTH = 230.8e-3;
-constexpr double SMALL_ARMOR_OUTER_WIDTH = 135.8e-3;
-constexpr double LIGHTBAR_WIDTH = 4.56e-3;
-constexpr double LIGHTBAR_LONG_EDGE_LENGTH = 51.1e-3;
-constexpr double LIGHTBAR_SHORT_EDGE_LENGTH = 46.48e-3;
+constexpr double LIGHTBAR_LENGTH = 56e-3;     // m
+constexpr double BIG_ARMOR_WIDTH = 230e-3;    // m
+constexpr double SMALL_ARMOR_WIDTH = 135e-3;  // m
 
-double armor_outer_width(ArmorType type)
-{
-  return type == ArmorType::big ? BIG_ARMOR_OUTER_WIDTH : SMALL_ARMOR_OUTER_WIDTH;
-}
-}  // namespace
+const std::vector<cv::Point3f> BIG_ARMOR_POINTS{
+  {0, BIG_ARMOR_WIDTH / 2, LIGHTBAR_LENGTH / 2},
+  {0, -BIG_ARMOR_WIDTH / 2, LIGHTBAR_LENGTH / 2},
+  {0, -BIG_ARMOR_WIDTH / 2, -LIGHTBAR_LENGTH / 2},
+  {0, BIG_ARMOR_WIDTH / 2, -LIGHTBAR_LENGTH / 2}};
+const std::vector<cv::Point3f> SMALL_ARMOR_POINTS{
+  {0, SMALL_ARMOR_WIDTH / 2, LIGHTBAR_LENGTH / 2},
+  {0, -SMALL_ARMOR_WIDTH / 2, LIGHTBAR_LENGTH / 2},
+  {0, -SMALL_ARMOR_WIDTH / 2, -LIGHTBAR_LENGTH / 2},
+  {0, SMALL_ARMOR_WIDTH / 2, -LIGHTBAR_LENGTH / 2}};
 
 Solver::Solver(const std::string & config_path) : R_gimbal2world_(Eigen::Matrix3d::Identity())
 {
@@ -54,7 +54,8 @@ void Solver::set_R_gimbal2world(const Eigen::Quaterniond & q)
 //solvePnP（获得姿态）
 void Solver::solve(Armor & armor) const
 {
-  const auto object_points = armor_object_points(armor.type, armor.point_layout);
+  const auto & object_points =
+    (armor.type == ArmorType::big) ? BIG_ARMOR_POINTS : SMALL_ARMOR_POINTS;
   solve_ippe(armor, object_points);
 
   // 平衡不做yaw优化，因为pitch假设不成立
@@ -68,55 +69,6 @@ void Solver::solve(Armor & armor) const
 
 std::vector<cv::Point2f> Solver::reproject_armor(
   const Eigen::Vector3d & xyz_in_world, double yaw, ArmorType type, ArmorName name) const
-{
-  return reproject_object_points(xyz_in_world, yaw, name, armor_object_points(type, ArmorPointLayout::outer));
-}
-
-std::vector<cv::Point2f> Solver::reproject_armor(const Armor & armor) const
-{
-  return reproject_object_points(
-    armor.xyz_in_world, armor.ypr_in_world[0], armor.name,
-    armor_object_points(armor.type, armor.point_layout));
-}
-
-std::vector<cv::Point3f> Solver::armor_object_points(
-  ArmorType type, ArmorPointLayout layout) const
-{
-  const auto outer_width = static_cast<float>(armor_outer_width(type));
-  const auto lightbar_width = static_cast<float>(LIGHTBAR_WIDTH);
-  const auto long_half_z = static_cast<float>(LIGHTBAR_LONG_EDGE_LENGTH / 2);
-  const auto short_half_z = static_cast<float>(LIGHTBAR_SHORT_EDGE_LENGTH / 2);
-  const auto left_outer_y = outer_width / 2.0f;
-  const auto left_inner_y = left_outer_y - lightbar_width;
-  const auto right_inner_y = -left_inner_y;
-  const auto right_outer_y = -left_outer_y;
-
-  switch (layout) {
-    case ArmorPointLayout::left_edge_pair:
-      return {
-        {0.0f, left_outer_y, long_half_z},
-        {0.0f, right_inner_y, short_half_z},
-        {0.0f, right_inner_y, -short_half_z},
-        {0.0f, left_outer_y, -long_half_z}};
-    case ArmorPointLayout::right_edge_pair:
-      return {
-        {0.0f, left_inner_y, short_half_z},
-        {0.0f, right_outer_y, long_half_z},
-        {0.0f, right_outer_y, -long_half_z},
-        {0.0f, left_inner_y, -short_half_z}};
-    case ArmorPointLayout::outer:
-    default:
-      return {
-        {0.0f, left_outer_y, long_half_z},
-        {0.0f, right_outer_y, long_half_z},
-        {0.0f, right_outer_y, -long_half_z},
-        {0.0f, left_outer_y, -long_half_z}};
-  }
-}
-
-std::vector<cv::Point2f> Solver::reproject_object_points(
-  const Eigen::Vector3d & xyz_in_world, double yaw, ArmorName name,
-  const std::vector<cv::Point3f> & object_points) const
 {
   auto sin_yaw = std::sin(yaw);
   auto cos_yaw = std::cos(yaw);
@@ -149,6 +101,7 @@ std::vector<cv::Point2f> Solver::reproject_object_points(
 
   // reproject
   std::vector<cv::Point2f> image_points;
+  const auto & object_points = (type == ArmorType::big) ? BIG_ARMOR_POINTS : SMALL_ARMOR_POINTS;
   cv::projectPoints(object_points, rvec, tvec, camera_matrix_, distort_coeffs_, image_points);
   return image_points;
 }
@@ -156,7 +109,8 @@ std::vector<cv::Point2f> Solver::reproject_object_points(
 double Solver::outpost_reprojection_error(Armor armor, const double & pitch)
 {
   // solve
-  const auto object_points = armor_object_points(armor.type, armor.point_layout);
+  const auto & object_points =
+    (armor.type == ArmorType::big) ? BIG_ARMOR_POINTS : SMALL_ARMOR_POINTS;
   solve_ippe(armor, object_points);
 
   auto yaw = armor.ypr_in_world[0];
@@ -264,8 +218,8 @@ double Solver::ippe_selection_cost(
   const double observed_tilt = lightbar_tilt_angle(armor.points);
   Armor pose_armor = armor;
   update_pose(pose_armor, rvec, tvec);
-  const auto projected_points = reproject_object_points(
-    pose_armor.xyz_in_world, pose_armor.ypr_in_world[0], armor.name, object_points);
+  const auto projected_points = reproject_armor(
+    pose_armor.xyz_in_world, pose_armor.ypr_in_world[0], armor.type, armor.name);
   const double candidate_tilt = lightbar_tilt_angle(projected_points);
 
   if (std::abs(observed_tilt) < 1e-6 || std::abs(candidate_tilt) < 1e-6) {
@@ -368,8 +322,7 @@ double Solver::SJTU_cost(
 double Solver::armor_reprojection_error(
   const Armor & armor, double yaw, const double & inclined) const
 {
-  auto image_points = reproject_object_points(
-    armor.xyz_in_world, yaw, armor.name, armor_object_points(armor.type, armor.point_layout));
+  auto image_points = reproject_armor(armor.xyz_in_world, yaw, armor.type, armor.name);
   auto error = 0.0;
   for (int i = 0; i < 4; i++) error += cv::norm(armor.points[i] - image_points[i]);
   // auto error = SJTU_cost(image_points, armor.points, inclined);
