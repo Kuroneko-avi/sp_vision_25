@@ -1,1 +1,0 @@
-timestamp_ms,yaw_current_input,yaw_position_output
