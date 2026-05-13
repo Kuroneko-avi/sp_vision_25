@@ -38,12 +38,12 @@ outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
 yaw_offset: 0.2 # degree -2.5
-pitch_offset: 11.5 # degree 2
+pitch_offset: 0.5 # degree 2
 comming_angle: 55 # degree
 leaving_angle: 15 # degree
 decision_speed: 7 # rad/s
 high_speed_delay_time: 0.065 # s
-low_speed_delay_time: 0.052 # s planner use this value
+low_speed_delay_time: 0.02 # s planner use this value
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
@@ -52,7 +52,7 @@ judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 camera_name: "hikrobot"
-exposure_ms: 2.5
+exposure_ms: 1.5
 gain: 16.9
 vid_pid: "2bdf:0001"
 
@@ -61,46 +61,16 @@ vid_pid: "2bdf:0001"
 #  0  0  1
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
-# 重投影误差: 0.2970px
-camera_matrix:
-  [
-    2362.8567686503243,
-    0,
-    717.97736462016246,
-    0,
-    2333.4579885082539,
-    556.8404113201351,
-    0,
-    0,
-    1,
-  ]
-distort_coeffs:
-  [
-    -0.046393055662647419,
-    -0.40591074542400812,
-    -0.00080338722074019394,
-    -0.00015455426413595798,
-    0,
-  ]
+# 重投影误差: 0.2967px
+camera_matrix: [2366.1728169568778, 0, 694.05494933677085, 0, 2336.9340923343043, 533.38847693639525, 0, 0, 1]
+distort_coeffs: [-0.095525266075741716, 0.3499005960773981, 0.0039465376952549872, -0.005397721996039162, 0]
 
-# 相机同理想情况的偏角: yaw0.50 pitch-10.74 roll7.27 degree
-# 标定板到世界坐标系原点的水平距离: 2.29 m
-# 标定板同竖直摆放时的偏角: yaw-47.55 pitch20.48 roll4.34 degree
-R_camera2gimbal:
-  [
-    -0.032205330798340509,
-    -0.18371117767232209,
-    0.98245255349376404,
-    -0.99172022164945384,
-    0.12813239517498154,
-    -0.0085493437338868342,
-    -0.12431338881925497,
-    -0.97459339855396654,
-    -0.18631663601327139,
-  ]
-t_camera2gimbal:
-  [0.05719132709251612, 0.0014511068629975829, 0.099718744806821982]
-#t_camera2gimbal:  [0, 0.0545, 0.07241]
+# 相机同理想情况的偏角: yaw-0.62 pitch-3.90 roll-1.49 degree
+# 标定板到世界坐标系原点的水平距离: 1.05 m
+# 标定板同竖直摆放时的偏角: yaw66.64 pitch7.36 roll-0.25 degree
+R_camera2gimbal: [0.012657898717088915, -0.067635593803698588, 0.99762979308503474, -0.99958481683787492, -0.026682502792713739, 0.010873729438826897, 0.025883808592630189, -0.99735323255882524, -0.06794525706185954]
+# t_camera2gimbal: [0.081921107128163112, 0.011818016217254618, -0.054264806335952293]
+t_camera2gimbal:  [0.03675, -0.0519, -0.03675]
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x100
@@ -118,21 +88,13 @@ pitch_kd: 0
 #####-----planner-----#####
 fire_thresh: 0.0035
 
-max_yaw_acc: 50
+max_yaw_acc: 44.2
 Q_yaw: [9e6, 0]
 R_yaw: [1]
 
-max_pitch_acc: 100
+max_pitch_acc: 74.6
 Q_pitch: [9e6, 0]
 R_pitch: [1]
-
-#####-----curve_generator参数-----#####
-curve_generator:
-  amplitude_deg: 10.0      # 单周期内 target_yaw 从 -amplitude_deg 扫到 +amplitude_deg
-  frequency_hz: 0.2        # target_yaw 周期频率
-  pitch_frequency_hz: 0.1  # target_pitch 阶跃切换频率
-  pitch_low_deg: -2.0      # target_pitch 阶跃低电平
-  pitch_high_deg: 2.0      # target_pitch 阶跃高电平
 
 #####-----plotter-----#####
 plotter:
@@ -164,3 +126,11 @@ dashboard:
   enabled: false
   robot_id: "myrobot"
   mqtt_host: "tcp://127.0.0.1:1883"
+
+#####-----curve_generator参数-----#####
+curve_generator:
+  amplitude_deg: 10.0      # 单周期内 target_yaw 从 -amplitude_deg 扫到 +amplitude_deg
+  frequency_hz: 0.2        # target_yaw 周期频率
+  pitch_frequency_hz: 0.1  # target_pitch 阶跃切换频率
+  pitch_low_deg: -2.0      # target_pitch 阶跃低电平
+  pitch_high_deg: 2.0      # target_pitch 阶跃高电平
