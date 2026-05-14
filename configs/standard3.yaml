@@ -36,6 +36,22 @@ min_detect_count: 5
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
+#####-----auto_aim_eskf参数-----#####
+auto_aim_eskf:
+  match_gate_at_1m: 700.0
+  match_gate_not_all_init_at_1m: 7000.0
+  qxyz_common: [20.0, 20.0, 1.0]
+  qyaw_common: 10.0
+  qxyz_output: [1.0, 1.0, 0.5]
+  qyaw_output: 0.01
+  q_r: 1.0e-7
+  q_l: 1.0e-7
+  q_h: 1.0e-7
+  q_outpost_dz: 0.5
+  r_uv_at_1m: 70.0
+  r_uv_min: 30.0
+  esekf_iter_num: 5
+
 #####-----aimer参数-----#####
 yaw_offset: 0.2 # degree -2.5
 pitch_offset: 11.5 # degree 2

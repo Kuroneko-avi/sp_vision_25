@@ -45,6 +45,14 @@ Solver::Solver(const std::string & config_path) : R_gimbal2world_(Eigen::Matrix3
 
 Eigen::Matrix3d Solver::R_gimbal2world() const { return R_gimbal2world_; }
 
+const cv::Mat & Solver::camera_matrix() const { return camera_matrix_; }
+
+const cv::Mat & Solver::distort_coeffs() const { return distort_coeffs_; }
+
+const Eigen::Matrix3d & Solver::R_camera2gimbal() const { return R_camera2gimbal_; }
+
+const Eigen::Vector3d & Solver::t_camera2gimbal() const { return t_camera2gimbal_; }
+
 void Solver::set_R_gimbal2world(const Eigen::Quaterniond & q)
 {
   Eigen::Matrix3d R_imubody2imuabs = q.toRotationMatrix();
