@@ -33,7 +33,7 @@ const std::string keys =
   "{robot-id       | myrobot                | MQTT Dashboard robot id}"
   "{mqtt-host      | tcp://127.0.0.1:1883   | MQTT broker URI}"
   "{@config-path   | configs/infantry.yaml | yaml config path }"
-  "{imu-delay-ms   | 6.0                    | IMU delay in milliseconds }";
+  "{imu-delay-ms   | 9.0                    | IMU delay in milliseconds }";
 
 int main(int argc, char * argv[])
 {

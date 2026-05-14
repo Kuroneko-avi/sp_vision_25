@@ -184,7 +184,7 @@ void Planner::setup_yaw_solver(const std::string & config_path)
   Eigen::MatrixXd u_max = Eigen::MatrixXd::Constant(1, HORIZON - 1, max_yaw_acc);
   tiny_set_bound_constraints(yaw_solver_, x_min, x_max, u_min, u_max);
 
-  yaw_solver_->settings->max_iter = 10;
+  yaw_solver_->settings->max_iter = 100;
 }
 
 void Planner::setup_pitch_solver(const std::string & config_path)
@@ -207,7 +207,7 @@ void Planner::setup_pitch_solver(const std::string & config_path)
   Eigen::MatrixXd u_max = Eigen::MatrixXd::Constant(1, HORIZON - 1, max_pitch_acc);
   tiny_set_bound_constraints(pitch_solver_, x_min, x_max, u_min, u_max);
 
-  pitch_solver_->settings->max_iter = 10;
+  pitch_solver_->settings->max_iter = 100;
 }
 
 Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_speed)
