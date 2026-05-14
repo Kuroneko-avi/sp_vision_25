@@ -58,7 +58,7 @@ auto build_reference(
   double pitch_low_rad, double pitch_high_rad)
 {
   auto yaw0 = evaluate_target_yaw(elapsed_s, yaw_amplitude_rad, yaw_frequency_hz);
-  auto traj = auto_aim::Trajectory::Zero();
+  auto_aim::Trajectory traj = auto_aim::Trajectory::Zero();
 
   for (int i = 0; i < auto_aim::HORIZON; ++i) {
     auto relative_t = (i - auto_aim::HALF_HORIZON) * auto_aim::DT;
