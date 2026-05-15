@@ -16,6 +16,37 @@ namespace
 constexpr double PI = 3.14159265358979323846;
 constexpr double DEG_TO_RAD = PI / 180.0;
 constexpr double RAD_TO_DEG = 180.0 / PI;
+
+Eigen::Vector4d select_auto_aim_xyza(const Target & target)
+{
+  Eigen::VectorXd ekf_x = target.ekf_x();
+  const std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
+
+  if (target.name == ArmorName::outpost) {
+    const double center_yaw = std::atan2(ekf_x[2], ekf_x[0]);
+    constexpr double COMING_ANGLE = 70.0 * DEG_TO_RAD;
+    constexpr double LEAVING_ANGLE = 30.0 * DEG_TO_RAD;
+
+    for (const auto & xyza : armor_xyza_list) {
+      const double delta_angle = tools::limit_rad(xyza[3] - center_yaw);
+      if (std::abs(delta_angle) > COMING_ANGLE) continue;
+      if (ekf_x[7] > 0.0 && delta_angle < LEAVING_ANGLE) return xyza;
+      if (ekf_x[7] < 0.0 && delta_angle > -LEAVING_ANGLE) return xyza;
+    }
+  }
+
+  Eigen::Vector4d selected_xyza = armor_xyza_list.front();
+  double min_dist = 1e10;
+  for (const auto & xyza : armor_xyza_list) {
+    const double dist = xyza.head<2>().norm();
+    if (dist < min_dist) {
+      min_dist = dist;
+      selected_xyza = xyza;
+    }
+  }
+
+  return selected_xyza;
+}
 }  // namespace
 
 Planner::Planner(const std::string & config_path)
@@ -65,49 +96,16 @@ bool Planner::apply_hot_param(const std::string & key, double value)
   return true;
 }
 
-Plan Planner::plan(Target target, double bullet_speed)
+Plan Planner::plan_trajectory(const Trajectory & traj, double yaw0)
 {
-  // 0. Check bullet speed
-  if (bullet_speed < 10 || bullet_speed > 25) {
-    bullet_speed = 22.5;
-  }
-
-  // 1. Predict fly_time
-  Eigen::Vector3d xyz;
-  auto min_dist = 1e10;
-  for (auto & xyza : target.armor_xyza_list()) {
-    auto dist = xyza.head<2>().norm();
-    if (dist < min_dist) {
-      min_dist = dist;
-      xyz = xyza.head<3>();
-    }
-  }
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
-  target.predict(bullet_traj.fly_time);
-
-  // 2. Get trajectory
-  double yaw0;
-  Trajectory traj;
-  try {
-    yaw0 = aim(target, bullet_speed)(0);
-    traj = get_trajectory(target, yaw0, bullet_speed);
-  } catch (const std::exception & e) {
-    tools::logger()->warn("Unsolvable target {:.2f}", bullet_speed);
-    return {false};
-  }
-
-  // 3. Solve yaw
   Eigen::VectorXd x0(2);
   x0 << traj(0, 0), traj(1, 0);
   tiny_set_x0(yaw_solver_, x0);
-
   yaw_solver_->work->Xref = traj.block(0, 0, 2, HORIZON);
   tiny_solve(yaw_solver_);
 
-  // 4. Solve pitch
   x0 << traj(2, 0), traj(3, 0);
   tiny_set_x0(pitch_solver_, x0);
-
   pitch_solver_->work->Xref = traj.block(2, 0, 2, HORIZON);
   tiny_solve(pitch_solver_);
 
@@ -140,6 +138,40 @@ Plan Planner::plan(Target target, double bullet_speed)
   return plan;
 }
 
+Plan Planner::plan(Target target, double bullet_speed)
+{
+  // 0. Check bullet speed
+  if (bullet_speed < 10 || bullet_speed > 25) {
+    bullet_speed = 22.5;
+  }
+
+  // 1. Predict fly_time
+  Eigen::Vector3d xyz;
+  auto min_dist = 1e10;
+  for (auto & xyza : target.armor_xyza_list()) {
+    auto dist = xyza.head<2>().norm();
+    if (dist < min_dist) {
+      min_dist = dist;
+      xyz = xyza.head<3>();
+    }
+  }
+  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  target.predict(bullet_traj.fly_time);
+
+  // 2. Get trajectory
+  double yaw0;
+  Trajectory traj;
+  try {
+    yaw0 = aim(target, bullet_speed)(0);
+    traj = get_trajectory(target, yaw0, bullet_speed);
+  } catch (const std::exception & e) {
+    tools::logger()->warn("Unsolvable target {:.2f}", bullet_speed);
+    return {false};
+  }
+
+  return plan_trajectory(traj, yaw0);
+}
+
 Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 {
   if (!target.has_value()) return {false};
@@ -163,7 +195,6 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 
   return plan(*target, bullet_speed);
 }
-
 void Planner::setup_yaw_solver(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
@@ -210,24 +241,17 @@ void Planner::setup_pitch_solver(const std::string & config_path)
   pitch_solver_->settings->max_iter = 10;
 }
 
-Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_speed)
+Eigen::Matrix<double, 2, 1> Planner::aim(
+  const Target & target, double bullet_speed, bool update_debug_xyza)
 {
-  Eigen::Vector3d xyz;
-  double yaw;
-  auto min_dist = 1e10;
+  const Eigen::Vector4d xyza = select_auto_aim_xyza(target);
+  const Eigen::Vector3d xyz = xyza.head<3>();
+  const double dist = xyza.head<2>().norm();
 
-  for (auto & xyza : target.armor_xyza_list()) {
-    auto dist = xyza.head<2>().norm();
-    if (dist < min_dist) {
-      min_dist = dist;
-      xyz = xyza.head<3>();
-      yaw = xyza[3];
-    }
-  }
-  debug_xyza = Eigen::Vector4d(xyz.x(), xyz.y(), xyz.z(), yaw);
+  if (update_debug_xyza) debug_xyza = xyza;
 
   auto azim = std::atan2(xyz.y(), xyz.x());
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  auto bullet_traj = tools::Trajectory(bullet_speed, dist, xyz.z());
   if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
 
   double yaw_offset;

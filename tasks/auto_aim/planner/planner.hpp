@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "tasks/auto_aim/target.hpp"
+#include "tasks/auto_aim_ekfpnp/target.hpp"
 #include "tinympc/tiny_api.hpp"
 
 namespace auto_aim
@@ -47,8 +48,11 @@ public:
   Eigen::Vector4d debug_xyza;
   Planner(const std::string & config_path);
 
+  Plan plan_trajectory(const Trajectory & traj, double yaw0);
   Plan plan(Target target, double bullet_speed);
   Plan plan(std::optional<Target> target, double bullet_speed);
+  Plan plan(auto_aim_ekfpnp::Target target, double bullet_speed);
+  Plan plan(std::optional<auto_aim_ekfpnp::Target> target, double bullet_speed);
   HotParams get_hot_params() const;
   bool apply_hot_param(const std::string & key, double value);
 
@@ -65,8 +69,11 @@ private:
   void setup_yaw_solver(const std::string & config_path);
   void setup_pitch_solver(const std::string & config_path);
 
-  Eigen::Matrix<double, 2, 1> aim(const Target & target, double bullet_speed);
+  Eigen::Matrix<double, 2, 1> aim(
+    const Target & target, double bullet_speed, bool update_debug_xyza = false);
+  Eigen::Matrix<double, 2, 1> aim(const auto_aim_ekfpnp::Target & target, double bullet_speed);
   Trajectory get_trajectory(Target & target, double yaw0, double bullet_speed);
+  Trajectory get_trajectory(auto_aim_ekfpnp::Target & target, double yaw0, double bullet_speed);
 };
 
 }  // namespace auto_aim
