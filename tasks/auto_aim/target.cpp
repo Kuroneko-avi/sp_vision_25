@@ -1,6 +1,8 @@
 #include "target.hpp"
 
+#include <algorithm>
 #include <numeric>
+#include <utility>
 
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
@@ -16,17 +18,23 @@ Target::Target(
   last_id(0),
   update_count_(0),
   armor_num_(armor_num),
-  t_(t),
+  switch_count_(0),
   is_switch_(false),
   is_converged_(false),
-  switch_count_(0)
+  outpost_height_ready_(false),
+  outpost_observed_mask_(0),
+  outpost_height_sums_{0.0, 0.0, 0.0},
+  outpost_height_counts_{0, 0, 0},
+  outpost_height_order_{0, 0, 0},
+  outpost_center_z_(0.0),
+  t_(t)
 {
   auto r = radius;
   priority = armor.priority;
   const Eigen::VectorXd & xyz = armor.xyz_in_world;
   const Eigen::VectorXd & ypr = armor.ypr_in_world;
 
-  // 旋转中心的坐标
+  // Rotation center coordinates in world frame.
   auto center_x = xyz[0] + r * std::cos(ypr[0]);
   auto center_y = xyz[1] + r * std::sin(ypr[0]);
   auto center_z = xyz[2];
@@ -35,34 +43,43 @@ Target::Target(
   // a: angle
   // w: angular velocity
   // l: r2 - r1
-  // h: z2 - z1
-  Eigen::VectorXd x0{{center_x, 0, center_y, 0, center_z, 0, ypr[0], 0, r, 0, 0}};  //初始化预测量
+  // h: z2 - z1 for normal 4-armor targets
+  Eigen::VectorXd x0{{center_x, 0, center_y, 0, center_z, 0, ypr[0], 0, r, 0, 0}};
   Eigen::MatrixXd P0 = P0_dig.asDiagonal();
 
-  // 防止夹角求和出现异常值
   auto x_add = [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) -> Eigen::VectorXd {
     Eigen::VectorXd c = a + b;
     c[6] = tools::limit_rad(c[6]);
     return c;
   };
 
-  ekf_ = tools::ExtendedKalmanFilter(x0, P0, x_add);  //初始化滤波器（预测量、预测量协方差）
+  ekf_ = tools::ExtendedKalmanFilter(x0, P0, x_add);
 }
 
-Target::Target(double x, double vyaw, double radius, double h) : armor_num_(4)
+Target::Target(double x, double vyaw, double radius, double h)
+: armor_num_(4),
+  switch_count_(0),
+  update_count_(0),
+  is_switch_(false),
+  is_converged_(false),
+  outpost_height_ready_(false),
+  outpost_observed_mask_(0),
+  outpost_height_sums_{0.0, 0.0, 0.0},
+  outpost_height_counts_{0, 0, 0},
+  outpost_height_order_{0, 0, 0},
+  outpost_center_z_(0.0)
 {
   Eigen::VectorXd x0{{x, 0, 0, 0, 0, 0, 0, vyaw, radius, 0, h}};
   Eigen::VectorXd P0_dig{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
   Eigen::MatrixXd P0 = P0_dig.asDiagonal();
 
-  // 防止夹角求和出现异常值
   auto x_add = [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) -> Eigen::VectorXd {
     Eigen::VectorXd c = a + b;
     c[6] = tools::limit_rad(c[6]);
     return c;
   };
 
-  ekf_ = tools::ExtendedKalmanFilter(x0, P0, x_add);  //初始化滤波器（预测量、预测量协方差）
+  ekf_ = tools::ExtendedKalmanFilter(x0, P0, x_add);
 }
 
 void Target::predict(std::chrono::steady_clock::time_point t)
@@ -74,7 +91,6 @@ void Target::predict(std::chrono::steady_clock::time_point t)
 
 void Target::predict(double dt)
 {
-  // 状态转移矩阵
   // clang-format off
   Eigen::MatrixXd F{
     {1, dt,  0,  0,  0,  0,  0,  0,  0,  0,  0},
@@ -91,53 +107,50 @@ void Target::predict(double dt)
   };
   // clang-format on
 
-  // Piecewise White Noise Model
-  // https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python/blob/master/07-Kalman-Filter-Math.ipynb
-  double v1, v2;
+  double v_xy, v_z, v_angle;
   if (name == ArmorName::outpost) {
-    v1 = 10;   // 前哨站加速度方差
-    v2 = 0.1;  // 前哨站角加速度方差
+    v_xy = 10;
+    v_z = use_outpost_staggered_height_model() ? 1e-3 : 10;
+    v_angle = 0.1;
   } else {
-    v1 = 100;  // 加速度方差
-    v2 = 400;  // 角加速度方差
+    v_xy = 100;
+    v_z = 100;
+    v_angle = 400;
   }
   auto a = dt * dt * dt * dt / 4;
   auto b = dt * dt * dt / 2;
   auto c = dt * dt;
-  // 预测过程噪声偏差的方差
   // clang-format off
   Eigen::MatrixXd Q{
-    {a * v1, b * v1,      0,      0,      0,      0,      0,      0, 0, 0, 0},
-    {b * v1, c * v1,      0,      0,      0,      0,      0,      0, 0, 0, 0},
-    {     0,      0, a * v1, b * v1,      0,      0,      0,      0, 0, 0, 0},
-    {     0,      0, b * v1, c * v1,      0,      0,      0,      0, 0, 0, 0},
-    {     0,      0,      0,      0, a * v1, b * v1,      0,      0, 0, 0, 0},
-    {     0,      0,      0,      0, b * v1, c * v1,      0,      0, 0, 0, 0},
-    {     0,      0,      0,      0,      0,      0, a * v2, b * v2, 0, 0, 0},
-    {     0,      0,      0,      0,      0,      0, b * v2, c * v2, 0, 0, 0},
+    {a * v_xy, b * v_xy,        0,        0,       0,       0,            0,            0, 0, 0, 0},
+    {b * v_xy, c * v_xy,        0,        0,       0,       0,            0,            0, 0, 0, 0},
+    {       0,        0, a * v_xy, b * v_xy,       0,       0,            0,            0, 0, 0, 0},
+    {       0,        0, b * v_xy, c * v_xy,       0,       0,            0,            0, 0, 0, 0},
+    {       0,        0,        0,        0, a * v_z, b * v_z,            0,            0, 0, 0, 0},
+    {       0,        0,        0,        0, b * v_z, c * v_z,            0,            0, 0, 0, 0},
+    {       0,        0,        0,        0,       0,       0, a * v_angle, b * v_angle, 0, 0, 0},
+    {       0,        0,        0,        0,       0,       0, b * v_angle, c * v_angle, 0, 0, 0},
     {     0,      0,      0,      0,      0,      0,      0,      0, 0, 0, 0},
     {     0,      0,      0,      0,      0,      0,      0,      0, 0, 0, 0},
     {     0,      0,      0,      0,      0,      0,      0,      0, 0, 0, 0}
   };
   // clang-format on
 
-  // 防止夹角求和出现异常值
   auto f = [&](const Eigen::VectorXd & x) -> Eigen::VectorXd {
     Eigen::VectorXd x_prior = F * x;
     x_prior[6] = tools::limit_rad(x_prior[6]);
     return x_prior;
   };
 
-  // 前哨站转速特判
-  if (this->convergened() && this->name == ArmorName::outpost && std::abs(this->ekf_.x[7]) > 2)
+  if (this->convergened() && this->name == ArmorName::outpost && std::abs(this->ekf_.x[7]) > 2) {
     this->ekf_.x[7] = this->ekf_.x[7] > 0 ? 2.51 : -2.51;
+  }
 
   ekf_.predict(F, Q, f);
 }
 
 void Target::update(const Armor & armor)
 {
-  // 装甲板匹配
   int id = 0;
   auto min_angle_error = 1e10;
   const std::vector<Eigen::Vector4d> & xyza_list = armor_xyza_list();
@@ -155,8 +168,7 @@ void Target::update(const Armor & armor)
       return ypd1[2] < ypd2[2];
     });
 
-  // 取前3个distance最小的装甲板
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < std::min(3, static_cast<int>(xyza_i_list.size())); i++) {
     const auto & xyza = xyza_i_list[i].first;
     Eigen::Vector3d ypd = tools::xyz2ypd(xyza.head(3));
     auto angle_error = std::abs(tools::limit_rad(armor.ypr_in_world[0] - xyza[3])) +
@@ -170,35 +182,30 @@ void Target::update(const Armor & armor)
 
   if (id != 0) jumped = true;
 
-  if (id != last_id) {
-    is_switch_ = true;
-  } else {
-    is_switch_ = false;
-  }
-
+  is_switch_ = id != last_id;
   if (is_switch_) switch_count_++;
 
   last_id = id;
   update_count_++;
 
+  record_outpost_observation(id, armor);
   update_ypda(armor, id);
 }
 
 void Target::update_ypda(const Armor & armor, int id)
 {
-  //观测jacobi
   Eigen::MatrixXd H = h_jacobian(ekf_.x, id);
-  // Eigen::VectorXd R_dig{{4e-3, 4e-3, 1, 9e-2}};
   auto center_yaw = std::atan2(armor.xyz_in_world[1], armor.xyz_in_world[0]);
   auto delta_angle = tools::limit_rad(armor.ypr_in_world[0] - center_yaw);
   Eigen::VectorXd R_dig{
     {4e-3, 4e-3, log(std::abs(delta_angle) + 1) + 1,
      log(std::abs(armor.ypd_in_world[2]) + 1) / 200 + 9e-2}};
+  if (use_outpost_staggered_height_model()) {
+    R_dig[1] *= 16.0;
+  }
 
-  //测量过程噪声偏差的方差
   Eigen::MatrixXd R = R_dig.asDiagonal();
 
-  // 定义非线性转换函数h: x -> z
   auto h = [&](const Eigen::VectorXd & x) -> Eigen::Vector4d {
     Eigen::VectorXd xyz = h_armor_xyz(x, id);
     Eigen::VectorXd ypd = tools::xyz2ypd(xyz);
@@ -206,7 +213,6 @@ void Target::update_ypda(const Armor & armor, int id)
     return {ypd[0], ypd[1], ypd[2], angle};
   };
 
-  // 防止夹角求差出现异常值
   auto z_subtract = [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) -> Eigen::VectorXd {
     Eigen::VectorXd c = a - b;
     c[0] = tools::limit_rad(c[0]);
@@ -217,7 +223,7 @@ void Target::update_ypda(const Armor & armor, int id)
 
   const Eigen::VectorXd & ypd = armor.ypd_in_world;
   const Eigen::VectorXd & ypr = armor.ypr_in_world;
-  Eigen::VectorXd z{{ypd[0], ypd[1], ypd[2], ypr[0]}};  //获得观测量
+  Eigen::VectorXd z{{ypd[0], ypd[1], ypd[2], ypr[0]}};
 
   ekf_.update(z, H, R, h, z_subtract);
 }
@@ -241,7 +247,7 @@ std::vector<Eigen::Vector4d> Target::armor_xyza_list() const
 bool Target::diverged() const
 {
   auto r_ok = ekf_.x[8] > 0.05 && ekf_.x[8] < 0.5;
-  auto l_ok = ekf_.x[8] + ekf_.x[9] > 0.05 && ekf_.x[8] + ekf_.x[9] < 0.5;
+  auto l_ok = ekf_.x[8] + ekf_.x[9] > 0.05 && ekf_.x[9] + ekf_.x[8] < 0.5;
 
   if (r_ok && l_ok) return false;
 
@@ -255,7 +261,6 @@ bool Target::convergened()
     is_converged_ = true;
   }
 
-  //前哨站特殊判断
   if (this->name == ArmorName::outpost && update_count_ > 10 && !this->diverged()) {
     is_converged_ = true;
   }
@@ -263,16 +268,92 @@ bool Target::convergened()
   return is_converged_;
 }
 
-// 计算出装甲板中心的坐标（考虑长短轴）
+bool Target::is_outpost_target() const
+{
+  return name == ArmorName::outpost && armor_num_ == OUTPOST_ARMOR_COUNT;
+}
+
+bool Target::use_outpost_staggered_height_model() const
+{
+  return is_outpost_target() && outpost_height_ready_;
+}
+
+void Target::record_outpost_observation(int id, const Armor & armor)
+{
+  if (!is_outpost_target() || id < 0 || id >= OUTPOST_ARMOR_COUNT) return;
+
+  outpost_observed_mask_ |= (1 << id);
+  outpost_height_sums_[id] += armor.xyz_in_world[2];
+  outpost_height_counts_[id] += 1;
+
+  if (outpost_height_ready_ || outpost_observed_mask_ != ((1 << OUTPOST_ARMOR_COUNT) - 1)) {
+    return;
+  }
+
+  std::array<std::pair<double, int>, OUTPOST_ARMOR_COUNT> avg_height_and_id{};
+  for (int i = 0; i < OUTPOST_ARMOR_COUNT; ++i) {
+    if (outpost_height_counts_[i] < OUTPOST_HEIGHT_MIN_SAMPLES) return;
+    const double avg_z = outpost_height_sums_[i] / std::max(1, outpost_height_counts_[i]);
+    avg_height_and_id[i] = {avg_z, i};
+  }
+  std::sort(
+    avg_height_and_id.begin(), avg_height_and_id.end(),
+    [](const auto & lhs, const auto & rhs) { return lhs.first < rhs.first; });
+
+  const double low_to_mid = avg_height_and_id[1].first - avg_height_and_id[0].first;
+  const double mid_to_high = avg_height_and_id[2].first - avg_height_and_id[1].first;
+  constexpr double MIN_HEIGHT_STEP = 0.06;
+  constexpr double MAX_HEIGHT_STEP = 0.20;
+  constexpr double MAX_STEP_DIFF = 0.08;
+  if (
+    low_to_mid < MIN_HEIGHT_STEP || low_to_mid > MAX_HEIGHT_STEP ||
+    mid_to_high < MIN_HEIGHT_STEP || mid_to_high > MAX_HEIGHT_STEP ||
+    std::abs(low_to_mid - mid_to_high) > MAX_STEP_DIFF) {
+    return;
+  }
+
+  outpost_height_order_.fill(0);
+  outpost_height_order_[avg_height_and_id[0].second] = -1;
+  outpost_height_order_[avg_height_and_id[1].second] = 0;
+  outpost_height_order_[avg_height_and_id[2].second] = 1;
+  outpost_height_ready_ = true;
+
+  outpost_center_z_ =
+    (avg_height_and_id[0].first + avg_height_and_id[1].first + avg_height_and_id[2].first) /
+    OUTPOST_ARMOR_COUNT;
+  ekf_.x[4] = outpost_center_z_;
+  ekf_.x[5] = 0.0;
+  for (int i = 0; i < ekf_.P.rows(); ++i) {
+    ekf_.P(4, i) = 0.0;
+    ekf_.P(i, 4) = 0.0;
+    ekf_.P(5, i) = 0.0;
+    ekf_.P(i, 5) = 0.0;
+  }
+  ekf_.P(4, 4) = 1e-4;
+  ekf_.P(5, 5) = 1e-3;
+  tools::logger()->info(
+    "[Target] Outpost height model activated, center_z = {:.3f}, avg_z=[{:.3f},{:.3f},{:.3f}], "
+    "order=[{},{},{}]",
+    outpost_center_z_, avg_height_and_id[0].first, avg_height_and_id[1].first,
+    avg_height_and_id[2].first, outpost_height_order_[0], outpost_height_order_[1],
+    outpost_height_order_[2]);
+}
+
+double Target::outpost_height_offset(int id) const
+{
+  if (!use_outpost_staggered_height_model() || id < 0 || id >= OUTPOST_ARMOR_COUNT) return 0.0;
+  return static_cast<double>(outpost_height_order_[id]) * OUTPOST_ARMOR_HEIGHT_STEP;
+}
+
 Eigen::Vector3d Target::h_armor_xyz(const Eigen::VectorXd & x, int id) const
 {
   auto angle = tools::limit_rad(x[6] + id * 2 * CV_PI / armor_num_);
   auto use_l_h = (armor_num_ == 4) && (id == 1 || id == 3);
 
-  auto r = (use_l_h) ? x[8] + x[9] : x[8];
+  auto r = use_l_h ? x[8] + x[9] : x[8];
   auto armor_x = x[0] - r * std::cos(angle);
   auto armor_y = x[2] - r * std::sin(angle);
-  auto armor_z = (use_l_h) ? x[4] + x[10] : x[4];
+  auto armor_z = use_l_h ? x[4] + x[10] : x[4] + outpost_height_offset(id);
 
   return {armor_x, armor_y, armor_z};
 }
@@ -282,16 +363,16 @@ Eigen::MatrixXd Target::h_jacobian(const Eigen::VectorXd & x, int id) const
   auto angle = tools::limit_rad(x[6] + id * 2 * CV_PI / armor_num_);
   auto use_l_h = (armor_num_ == 4) && (id == 1 || id == 3);
 
-  auto r = (use_l_h) ? x[8] + x[9] : x[8];
+  auto r = use_l_h ? x[8] + x[9] : x[8];
   auto dx_da = r * std::sin(angle);
   auto dy_da = -r * std::cos(angle);
 
   auto dx_dr = -std::cos(angle);
   auto dy_dr = -std::sin(angle);
-  auto dx_dl = (use_l_h) ? -std::cos(angle) : 0.0;
-  auto dy_dl = (use_l_h) ? -std::sin(angle) : 0.0;
+  auto dx_dl = use_l_h ? -std::cos(angle) : 0.0;
+  auto dy_dl = use_l_h ? -std::sin(angle) : 0.0;
 
-  auto dz_dh = (use_l_h) ? 1.0 : 0.0;
+  const double dz_dh = use_l_h ? 1.0 : 0.0;
 
   // clang-format off
   Eigen::MatrixXd H_armor_xyza{

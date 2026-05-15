@@ -1,5 +1,6 @@
 #include "planner.hpp"
 
+#include <cmath>
 #include <vector>
 
 #include "tools/math_tools.hpp"
@@ -10,11 +11,49 @@ using namespace std::chrono_literals;
 
 namespace auto_aim
 {
+namespace
+{
+constexpr double PI = 3.14159265358979323846;
+constexpr double DEG_TO_RAD = PI / 180.0;
+constexpr double RAD_TO_DEG = 180.0 / PI;
+
+Eigen::Vector4d select_auto_aim_xyza(const Target & target)
+{
+  Eigen::VectorXd ekf_x = target.ekf_x();
+  const std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
+
+  if (target.name == ArmorName::outpost) {
+    const double center_yaw = std::atan2(ekf_x[2], ekf_x[0]);
+    constexpr double COMING_ANGLE = 70.0 * DEG_TO_RAD;
+    constexpr double LEAVING_ANGLE = 30.0 * DEG_TO_RAD;
+
+    for (const auto & xyza : armor_xyza_list) {
+      const double delta_angle = tools::limit_rad(xyza[3] - center_yaw);
+      if (std::abs(delta_angle) > COMING_ANGLE) continue;
+      if (ekf_x[7] > 0.0 && delta_angle < LEAVING_ANGLE) return xyza;
+      if (ekf_x[7] < 0.0 && delta_angle > -LEAVING_ANGLE) return xyza;
+    }
+  }
+
+  Eigen::Vector4d selected_xyza = armor_xyza_list.front();
+  double min_dist = 1e10;
+  for (const auto & xyza : armor_xyza_list) {
+    const double dist = xyza.head<2>().norm();
+    if (dist < min_dist) {
+      min_dist = dist;
+      selected_xyza = xyza;
+    }
+  }
+
+  return selected_xyza;
+}
+}  // namespace
+
 Planner::Planner(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
-  yaw_offset_ = tools::read<double>(yaml, "yaw_offset") / 57.3;
-  pitch_offset_ = tools::read<double>(yaml, "pitch_offset") / 57.3;
+  yaw_offset_ = tools::read<double>(yaml, "yaw_offset") * DEG_TO_RAD;
+  pitch_offset_ = tools::read<double>(yaml, "pitch_offset") * DEG_TO_RAD;
   fire_thresh_ = tools::read<double>(yaml, "fire_thresh");
   decision_speed_ = tools::read<double>(yaml, "decision_speed");
   high_speed_delay_time_ = tools::read<double>(yaml, "high_speed_delay_time");
@@ -22,6 +61,81 @@ Planner::Planner(const std::string & config_path)
 
   setup_yaw_solver(config_path);
   setup_pitch_solver(config_path);
+}
+
+Planner::HotParams Planner::get_hot_params() const
+{
+  std::lock_guard<std::mutex> lock(params_mutex_);
+  return {
+    yaw_offset_ * RAD_TO_DEG,
+    pitch_offset_ * RAD_TO_DEG,
+    fire_thresh_,
+    decision_speed_,
+    high_speed_delay_time_,
+    low_speed_delay_time_};
+}
+
+bool Planner::apply_hot_param(const std::string & key, double value)
+{
+  std::lock_guard<std::mutex> lock(params_mutex_);
+  if (key == "yaw_offset_deg") {
+    yaw_offset_ = value * DEG_TO_RAD;
+  } else if (key == "pitch_offset_deg") {
+    pitch_offset_ = value * DEG_TO_RAD;
+  } else if (key == "fire_thresh") {
+    fire_thresh_ = value;
+  } else if (key == "decision_speed") {
+    decision_speed_ = value;
+  } else if (key == "high_speed_delay_time") {
+    high_speed_delay_time_ = value;
+  } else if (key == "low_speed_delay_time") {
+    low_speed_delay_time_ = value;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+Plan Planner::plan_trajectory(const Trajectory & traj, double yaw0)
+{
+  Eigen::VectorXd x0(2);
+  x0 << traj(0, 0), traj(1, 0);
+  tiny_set_x0(yaw_solver_, x0);
+  yaw_solver_->work->Xref = traj.block(0, 0, 2, HORIZON);
+  tiny_solve(yaw_solver_);
+
+  x0 << traj(2, 0), traj(3, 0);
+  tiny_set_x0(pitch_solver_, x0);
+  pitch_solver_->work->Xref = traj.block(2, 0, 2, HORIZON);
+  tiny_solve(pitch_solver_);
+
+  Plan plan;
+  plan.control = true;
+
+  plan.target_yaw = tools::limit_rad(traj(0, HALF_HORIZON) + yaw0);
+  plan.target_pitch = traj(2, HALF_HORIZON);
+
+  plan.yaw = tools::limit_rad(yaw_solver_->work->x(0, HALF_HORIZON) + yaw0);
+  plan.yaw_vel = yaw_solver_->work->x(1, HALF_HORIZON);
+  plan.yaw_acc = yaw_solver_->work->u(0, HALF_HORIZON);
+
+  plan.pitch = pitch_solver_->work->x(0, HALF_HORIZON);
+  plan.pitch_vel = pitch_solver_->work->x(1, HALF_HORIZON);
+  plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
+
+  auto shoot_offset_ = 2;
+  double fire_thresh;
+  {
+    std::lock_guard<std::mutex> lock(params_mutex_);
+    fire_thresh = fire_thresh_;
+  }
+
+  plan.fire =
+    std::hypot(
+      traj(0, HALF_HORIZON + shoot_offset_) - yaw_solver_->work->x(0, HALF_HORIZON + shoot_offset_),
+      traj(2, HALF_HORIZON + shoot_offset_) -
+        pitch_solver_->work->x(0, HALF_HORIZON + shoot_offset_)) < fire_thresh;
+  return plan;
 }
 
 Plan Planner::plan(Target target, double bullet_speed)
@@ -55,50 +169,25 @@ Plan Planner::plan(Target target, double bullet_speed)
     return {false};
   }
 
-  // 3. Solve yaw
-  Eigen::VectorXd x0(2);
-  x0 << traj(0, 0), traj(1, 0);
-  tiny_set_x0(yaw_solver_, x0);
-
-  yaw_solver_->work->Xref = traj.block(0, 0, 2, HORIZON);
-  tiny_solve(yaw_solver_);
-
-  // 4. Solve pitch
-  x0 << traj(2, 0), traj(3, 0);
-  tiny_set_x0(pitch_solver_, x0);
-
-  pitch_solver_->work->Xref = traj.block(2, 0, 2, HORIZON);
-  tiny_solve(pitch_solver_);
-
-  Plan plan;
-  plan.control = true;
-
-  plan.target_yaw = tools::limit_rad(traj(0, HALF_HORIZON) + yaw0);
-  plan.target_pitch = traj(2, HALF_HORIZON);
-
-  plan.yaw = tools::limit_rad(yaw_solver_->work->x(0, HALF_HORIZON) + yaw0);
-  plan.yaw_vel = yaw_solver_->work->x(1, HALF_HORIZON);
-  plan.yaw_acc = yaw_solver_->work->u(0, HALF_HORIZON);
-
-  plan.pitch = pitch_solver_->work->x(0, HALF_HORIZON);
-  plan.pitch_vel = pitch_solver_->work->x(1, HALF_HORIZON);
-  plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
-
-  auto shoot_offset_ = 2;
-  plan.fire =
-    std::hypot(
-      traj(0, HALF_HORIZON + shoot_offset_) - yaw_solver_->work->x(0, HALF_HORIZON + shoot_offset_),
-      traj(2, HALF_HORIZON + shoot_offset_) -
-        pitch_solver_->work->x(0, HALF_HORIZON + shoot_offset_)) < fire_thresh_;
-  return plan;
+  return plan_trajectory(traj, yaw0);
 }
 
 Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 {
   if (!target.has_value()) return {false};
 
-  double delay_time =
-    std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
+  double decision_speed;
+  double high_speed_delay_time;
+  double low_speed_delay_time;
+  {
+    std::lock_guard<std::mutex> lock(params_mutex_);
+    decision_speed = decision_speed_;
+    high_speed_delay_time = high_speed_delay_time_;
+    low_speed_delay_time = low_speed_delay_time_;
+  }
+
+  double delay_time = std::abs(target->ekf_x()[7]) > decision_speed ? high_speed_delay_time
+                                                                    : low_speed_delay_time;
 
   auto future = std::chrono::steady_clock::now() + std::chrono::microseconds(int(delay_time * 1e6));
 
@@ -106,7 +195,6 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 
   return plan(*target, bullet_speed);
 }
-
 void Planner::setup_yaw_solver(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
@@ -153,27 +241,28 @@ void Planner::setup_pitch_solver(const std::string & config_path)
   pitch_solver_->settings->max_iter = 10;
 }
 
-Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_speed)
+Eigen::Matrix<double, 2, 1> Planner::aim(
+  const Target & target, double bullet_speed, bool update_debug_xyza)
 {
-  Eigen::Vector3d xyz;
-  double yaw;
-  auto min_dist = 1e10;
+  const Eigen::Vector4d xyza = select_auto_aim_xyza(target);
+  const Eigen::Vector3d xyz = xyza.head<3>();
+  const double dist = xyza.head<2>().norm();
 
-  for (auto & xyza : target.armor_xyza_list()) {
-    auto dist = xyza.head<2>().norm();
-    if (dist < min_dist) {
-      min_dist = dist;
-      xyz = xyza.head<3>();
-      yaw = xyza[3];
-    }
-  }
-  debug_xyza = Eigen::Vector4d(xyz.x(), xyz.y(), xyz.z(), yaw);
+  if (update_debug_xyza) debug_xyza = xyza;
 
   auto azim = std::atan2(xyz.y(), xyz.x());
-  auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
+  auto bullet_traj = tools::Trajectory(bullet_speed, dist, xyz.z());
   if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
 
-  return {tools::limit_rad(azim + yaw_offset_), -bullet_traj.pitch - pitch_offset_};
+  double yaw_offset;
+  double pitch_offset;
+  {
+    std::lock_guard<std::mutex> lock(params_mutex_);
+    yaw_offset = yaw_offset_;
+    pitch_offset = pitch_offset_;
+  }
+
+  return {tools::limit_rad(azim + yaw_offset), -bullet_traj.pitch - pitch_offset};
 }
 
 Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_speed)

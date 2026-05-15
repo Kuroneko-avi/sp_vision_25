@@ -8,11 +8,11 @@ yolo11_model_path: assets/yolo11.xml
 yolov8_model_path: assets/yolov8.xml
 yolov5_model_path: assets/yolov5.xml
 device: CPU
-min_confidence: 0.8
+min_confidence: 0.4
 use_traditional: false
 
 #####-----ROI-----#####
-roi: 
+roi:
   x: 420
   y: 50
   width: 600
@@ -31,10 +31,11 @@ max_armor_ratio: 5
 max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 
-#####-----tracker参数-----#####                                                             
+#####-----tracker参数-----#####
 min_detect_count: 5
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
+outpost_bad_converge_threshold: 0.55
 
 #####-----aimer参数-----#####
 yaw_offset: 0.2 # degree -2.5
@@ -43,7 +44,7 @@ comming_angle: 55 # degree
 leaving_angle: 15 # degree
 decision_speed: 7 # rad/s
 high_speed_delay_time: 0.065 # s
-low_speed_delay_time: 0.052 # s planner use this value
+low_speed_delay_time: 0.085 # s planner use this value
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
@@ -62,14 +63,44 @@ vid_pid: "2bdf:0001"
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
 # 重投影误差: 0.2970px
-camera_matrix: [2362.8567686503243, 0, 717.97736462016246, 0, 2333.4579885082539, 556.8404113201351, 0, 0, 1]
-distort_coeffs: [-0.046393055662647419, -0.40591074542400812, -0.00080338722074019394, -0.00015455426413595798, 0]
+camera_matrix:
+  [
+    2362.8567686503243,
+    0,
+    717.97736462016246,
+    0,
+    2333.4579885082539,
+    556.8404113201351,
+    0,
+    0,
+    1,
+  ]
+distort_coeffs:
+  [
+    -0.046393055662647419,
+    -0.40591074542400812,
+    -0.00080338722074019394,
+    -0.00015455426413595798,
+    0,
+  ]
 
 # 相机同理想情况的偏角: yaw0.50 pitch-10.74 roll7.27 degree
 # 标定板到世界坐标系原点的水平距离: 2.29 m
 # 标定板同竖直摆放时的偏角: yaw-47.55 pitch20.48 roll4.34 degree
-R_camera2gimbal: [-0.032205330798340509, -0.18371117767232209, 0.98245255349376404, -0.99172022164945384, 0.12813239517498154, -0.0085493437338868342, -0.12431338881925497, -0.97459339855396654, -0.18631663601327139]
-t_camera2gimbal: [0.05719132709251612, 0.0014511068629975829, 0.099718744806821982]
+R_camera2gimbal:
+  [
+    -0.032205330798340509,
+    -0.18371117767232209,
+    0.98245255349376404,
+    -0.99172022164945384,
+    0.12813239517498154,
+    -0.0085493437338868342,
+    -0.12431338881925497,
+    -0.97459339855396654,
+    -0.18631663601327139,
+  ]
+t_camera2gimbal:
+  [0.05719132709251612, 0.0014511068629975829, 0.099718744806821982]
 #t_camera2gimbal:  [0, 0.0545, 0.07241]
 
 #####-----cboard参数-----#####
@@ -89,16 +120,48 @@ pitch_kd: 0
 fire_thresh: 0.0035
 
 max_yaw_acc: 50
-Q_yaw: [9e2, 0]
+Q_yaw: [9e6, 0]
 R_yaw: [1]
 
 max_pitch_acc: 100
 Q_pitch: [9e6, 0]
 R_pitch: [1]
 
+#####-----curve_generator参数-----#####
+curve_generator:
+  amplitude_deg: 10.0      # 单周期内 target_yaw 从 -amplitude_deg 扫到 +amplitude_deg
+  frequency_hz: 0.2        # target_yaw 周期频率
+  pitch_frequency_hz: 0.1  # target_pitch 阶跃切换频率
+  pitch_low_deg: -2.0      # target_pitch 阶跃低电平
+  pitch_high_deg: 2.0      # target_pitch 阶跃高电平
+
+#####-----plotter-----#####
+plotter:
+  host: "127.0.0.1" # PlotJuggler UDP host, change to Windows LAN IP for cross-device debug
+  port: 9870
+
 #####-----buff_detector参数-----#####
 model: "assets/yolo11_buff_int8.xml"
 
+#####-----buff_fyt_detector参数-----#####
+buff_fyt_detector:
+  model: "assets/yolox_rune_3.6m.xml"
+  device_type: "CPU"
+  confidence_threshold: 0.7
+  top_k: 128
+  nms_threshold: 0.3
+  detect_r_tag: true
+  min_lightness: 90
+  r_tag_roi_half_size: 120
+  r_tag_max_distance: 80
+  r_tag_min_area: 12
+
 #####-----buff_aimer参数-----#####
-fire_gap_time: 0.700   # s
-predict_time: 0.120     # s
+fire_gap_time: 0.700 # s
+predict_time: 0.120 # s
+
+#####-----dashboard参数-----#####
+dashboard:
+  enabled: false
+  robot_id: "myrobot"
+  mqtt_host: "tcp://127.0.0.1:1883"
