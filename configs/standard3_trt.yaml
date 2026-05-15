@@ -9,7 +9,7 @@ device: GPU
 min_confidence: 0.8
 use_traditional: false
 #####-----ROI-----#####
-roi: 
+roi:
   x: 420
   y: 50
   width: 600
@@ -28,10 +28,11 @@ max_armor_ratio: 5
 max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 
-#####-----tracker参数-----#####                                                             
+#####-----tracker参数-----#####
 min_detect_count: 5
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
+outpost_bad_converge_threshold: 0.55
 
 #####-----aimer参数-----#####
 yaw_offset: 0.2 # degree -2.5
@@ -59,14 +60,44 @@ vid_pid: "2bdf:0001"
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
 # 重投影误差: 0.3500px
-camera_matrix: [2398.5520461231717, 0, 767.14678727014507, 0, 2372.6817339325962, 552.05667863695635, 0, 0, 1]
-distort_coeffs: [-0.060415020433018288, 0.19967699039178141, 0.0023548462848139262, 4.235404943416944e-05, 0]
+camera_matrix:
+  [
+    2398.5520461231717,
+    0,
+    767.14678727014507,
+    0,
+    2372.6817339325962,
+    552.05667863695635,
+    0,
+    0,
+    1,
+  ]
+distort_coeffs:
+  [
+    -0.060415020433018288,
+    0.19967699039178141,
+    0.0023548462848139262,
+    4.235404943416944e-05,
+    0,
+  ]
 
 # 相机同理想情况的偏角: yaw0.38 pitch-1.76 roll0.10 degree
 # 标定板到世界坐标系原点的水平距离: 1.22 m
 # 标定板同竖直摆放时的偏角: yaw20.36 pitch-2.53 roll-0.47 degree
-R_camera2gimbal: [-0.0067504159377077197, -0.030611291501099654, 0.99950856960673573, -0.99997573695937425, 0.001925579223141345, -0.0066945976139216913, -0.0017197026559442976, -0.99952950980813482, -0.030623547238767545]
-t_camera2gimbal: [0.054719538209757647, 0.0094399522423040567, 0.10810956168050045]
+R_camera2gimbal:
+  [
+    -0.0067504159377077197,
+    -0.030611291501099654,
+    0.99950856960673573,
+    -0.99997573695937425,
+    0.001925579223141345,
+    -0.0066945976139216913,
+    -0.0017197026559442976,
+    -0.99952950980813482,
+    -0.030623547238767545,
+  ]
+t_camera2gimbal:
+  [0.054719538209757647, 0.0094399522423040567, 0.10810956168050045]
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x100
@@ -92,9 +123,35 @@ max_pitch_acc: 100
 Q_pitch: [9e6, 0]
 R_pitch: [1]
 
+#####-----curve_generator参数-----#####
+curve_generator:
+  amplitude_deg: 10.0 # 单周期内 target_yaw 从 -amplitude_deg 扫到 +amplitude_deg
+  frequency_hz: 0.2 # target_yaw 周期频率
+  pitch_frequency_hz: 0.1 # target_pitch 阶跃切换频率
+  pitch_low_deg: -2.0 # target_pitch 阶跃低电平
+  pitch_high_deg: 2.0 # target_pitch 阶跃高电平
+
+#####-----plotter-----#####
+plotter:
+  host: "127.0.0.1" # PlotJuggler UDP host, change to Windows LAN IP for cross-device debug
+  port: 9870
+
 #####-----buff_detector参数-----#####
 model: "assets/yolo11_buff_int8.xml"
 
+#####-----buff_fyt_detector参数-----#####
+buff_fyt_detector:
+  model: "assets/yolox_rune_3.6m.xml"
+  device_type: "CPU"
+  confidence_threshold: 0.7
+  top_k: 128
+  nms_threshold: 0.3
+  detect_r_tag: true
+  min_lightness: 90
+  r_tag_roi_half_size: 120
+  r_tag_max_distance: 80
+  r_tag_min_area: 12
+
 #####-----buff_aimer参数-----#####
-fire_gap_time: 0.700   # s
-predict_time: 0.120     # s
+fire_gap_time: 0.500 # s
+predict_time: 0.120 # s
