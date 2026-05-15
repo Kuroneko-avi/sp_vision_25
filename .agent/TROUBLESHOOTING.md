@@ -94,6 +94,17 @@
      tail -f logs/*.screenlog | grep -E "send|recv"
      ```
 
+4. **`auto_aim_debug_mpc_trt` 运行几秒后绿框卡住、红框错位、云台持续偏向一侧**:
+   - 典型表现: 前 2-3 秒基本正常，随后 `reprojection` 窗口开始掉帧，绿色重投影像停在旧位置，红色瞄准框明显不再贴合当前目标，目标明明在视野里也会间歇性完全识别不到。
+   - 优先怀疑: 主循环开始消费陈旧图像/陈旧姿态，而不是先怀疑 `planner` 延时参数。若相机帧队列或 `io::Gimbal` 姿态队列在满时保留旧数据、丢弃新数据，TRT 推理一旦略慢，系统就会持续“追历史”，云台会越控越偏。
+   - 当前仓库处理: 相机队列与云台姿态队列都改为 `ThreadSafeQueue<..., true>`，即队满时丢最旧、保最新，优先满足实时性。
+   - 运行时先看 `auto_aim_debug_mpc_trt` 叠加字样和 Plotter 字段:
+     - `frame_age_ms`: 当前处理图像距离“现在”的年龄；若持续升高，说明主循环已经落后。
+     - `loop_dt_ms`: 主循环周期间隔；若明显高于预期帧间隔，说明有阻塞。
+     - `trt_total_ms` / `trt_gpu_ms`: TRT 总耗时和 GPU 核心耗时；若这里抖动，先查 TRT 推理链路。
+     - `target_age_ms`: 规划线程消费的目标年龄；若该值过大，当前实现会主动丢弃该目标，避免旧目标继续控制云台。
+   - 若 `frame_age_ms`、`loop_dt_ms` 平稳但仍漏检，再转查 `enemy_color`、ROI、`min_confidence`、角点质量和 TRT 输出本身；不要先改 `high_speed_delay_time` / `low_speed_delay_time`。
+
 ## 标定问题排查
 
 ### 标定失败流程

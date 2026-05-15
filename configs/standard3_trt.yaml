@@ -34,8 +34,8 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-yaw_offset: 0.2 # degree -2.5
-pitch_offset: 11.5 # degree 2
+yaw_offset: -0.2 # degree -2.5
+pitch_offset: 7.2 # degree 2
 comming_angle: 55 # degree
 leaving_angle: 15 # degree
 decision_speed: 7 # rad/s
@@ -60,7 +60,7 @@ R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
 # 重投影误差: 0.2970px
 camera_matrix: [2362.8567686503243, 0, 717.97736462016246, 0, 2333.4579885082539, 556.8404113201351, 0, 0, 1]
-distort_coeffs: [-0.046393055662647419, -0.40591074542400812, -0.00080338722074019394, -0.00015455426413595798, 0]
+distort_coeffs: [-0.046393055662647419, -0.40591074542400812, -0.00080338722074019394, -0.00015455426413595798, 0] 
 
 # 相机同理想情况的偏角: yaw0.50 pitch-10.74 roll7.27 degree
 # 标定板到世界坐标系原点的水平距离: 2.29 m
@@ -99,3 +99,8 @@ model: "assets/yolo11_buff_int8.xml"
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
+
+#####-----plotter-----#####
+plotter:
+  host: "127.0.0.1" # PlotJuggler UDP host, change to Windows LAN IP for cross-device debug
+  port: 9870

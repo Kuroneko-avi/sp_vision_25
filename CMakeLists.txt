@@ -125,6 +125,7 @@ add_executable(dashboard_params_test tests/dashboard_params_test.cpp)
 if(TARGET mqtt_bridge)
     add_executable(mqtt_bridge_smoke tests/mqtt_bridge_smoke.cpp)
 endif()
+add_executable(auto_aim_debug_utils_test tests/auto_aim_debug_utils_test.cpp)
 
 target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 target_link_libraries(yolov5_trt_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools auto_aim)
@@ -155,6 +156,7 @@ if(TARGET mqtt_bridge)
         tools
     )
 endif()
+target_link_libraries(auto_aim_debug_utils_test ${OpenCV_LIBS} fmt::fmt tools)
 
 add_executable(gimbal_test tests/gimbal_test.cpp)
 target_link_libraries(gimbal_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
@@ -164,6 +166,9 @@ target_link_libraries(planner_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim too
 
 add_executable(planner_test_offline tests/planner_test_offline.cpp)
 target_link_libraries(planner_test_offline ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
+
+add_executable(planner_pitch_sign_test tests/planner_pitch_sign_test.cpp)
+target_link_libraries(planner_pitch_sign_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
 
 # 检查 ROS 环境
 find_package(ament_cmake QUIET)

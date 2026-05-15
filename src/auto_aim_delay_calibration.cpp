@@ -15,7 +15,7 @@
 #include "io/camera.hpp"
 #include "io/gimbal/gimbal.hpp"
 #include "tasks/auto_aim/solver.hpp"
-#include "tasks/auto_aim/yolo.hpp"
+#include "tasks/auto_aim/yolos/yolov5_trt.hpp"
 #include "tools/exiter.hpp"
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
@@ -30,11 +30,11 @@ using Clock = std::chrono::steady_clock;
 
 const std::string keys =
   "{help h usage ? |                        | output command line help }"
-  "{@config-path   | configs/standard3.yaml | yaml config path }"
+  "{@config-path   | configs/standard3_trt.yaml | yaml config path }"
   "{freq-hz        | 0.8                    | yaw sine frequency in Hz }"
   "{amp-deg        | 8.0                    | yaw sine amplitude in degrees }"
-  "{delay-min-ms   | -4.0                   | minimum IMU delay in milliseconds }"
-  "{delay-max-ms   | 12.0                   | maximum IMU delay in milliseconds }"
+  "{delay-min-ms   | 0.0                   | minimum IMU delay in milliseconds }"
+  "{delay-max-ms   | 40.0                   | maximum IMU delay in milliseconds }"
   "{delay-step-ms  | 1.0                    | IMU delay step in milliseconds }"
   "{sample-sec     | 5.0                    | sampling time per delay in seconds }"
   "{warmup-sec     | 2.0                    | warmup time before sweep in seconds }"
@@ -184,7 +184,7 @@ int main(int argc, char * argv[])
 
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
-  auto_aim::YOLO yolo(config_path, true);
+  auto_aim:: YOLOV5TRT yolo(config_path, true);
   auto_aim::Solver solver(config_path);
 
   const auto initial_state = gimbal.state();
@@ -238,7 +238,7 @@ int main(int argc, char * argv[])
     const auto q = gimbal.q(t - to_duration_ms(current_delay_ms));
     solver.set_R_gimbal2world(q);
 
-    auto armors = yolo.detect(img);
+    auto armors = yolo.detect(img,-1);
     auto selected = select_armor(armors);
     bool accepted = false;
 

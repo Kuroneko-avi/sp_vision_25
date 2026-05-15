@@ -78,6 +78,8 @@
 - **2026-05-01**: 修复 Dashboard PR review：MQTT start 失败会 best-effort 关闭连接，DashboardParams 不再依赖硬编码 `configs/standard3.yaml`，前端分仓文档去除本机绝对路径。
 - **2026-05-01**: 精简 Dashboard 文档：新增 `docs/dashboard.md` 最终版，删除重复的运行、broker、build、分仓和 changelog 文档，保留 `docs/dashboard_mqtt_protocol.md` 作为兼容跳转。
 - **2026-05-13**: 新增 `src/curve_generator.cpp` 和 `curve_generator` 可执行文件，支持通过 `curve_generator.amplitude_deg` / `curve_generator.frequency_hz` 生成锯齿 `target_yaw`，并通过 `curve_generator.pitch_frequency_hz` / `curve_generator.pitch_low_deg` / `curve_generator.pitch_high_deg` 生成阶跃 `target_pitch`，复用 `Planner::plan_trajectory` 下发控制，并每 5 秒打印理论开火占比。
+- **2026-05-15**: 统一 `auto_aim` / `auto_aim_ekfpnp` 的 pitch 语义为世界系抬头为正；`auto_aim_debug_mpc*`、`curve_generator` 与 `planner_test_offline` 同步补齐原始值字段和调试绘图符号镜像。
+- **2026-05-16**: 修复 `auto_aim_debug_mpc_trt` 的实时链路陈旧数据问题：相机/云台队列改为队满丢最旧，TRT 调试入口新增 `frame_age_ms`、`loop_dt_ms`、`trt_*_ms`、`target_age_ms` 观测字段，并在目标陈旧时停止继续控制云台。
 - **2026-04-26**: 完成 Dashboard 热参数模型 H：新增 `DashboardParams`、Planner/Buff Aimer 热参数快照与单参数 apply，验证范围不包含 TinyMPC Q/R/max_acc 热修改；2026-04-30 后 Buff Aimer 热参链路已按新范围移除。
 - **2026-04-15**: 将隐藏知识目录更名为 `.agent/`，并同步更新仓库内所有元规则与文档引用路径。
 - **2026-04-15**: 将仓库根 `AGENTS.md` 重写为精简的元规则入口文件，仅保留上下文加载顺序、知识路由与收尾同步要求。

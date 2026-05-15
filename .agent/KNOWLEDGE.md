@@ -117,7 +117,7 @@ R_gimbal2world_ = R_gimbal2imubody_.transpose() * R_imubody2world * R_gimbal2imu
 - **计算过程**：
   1. `aim()` 函数接收目标在世界坐标系下的位置 `xyz`（来自 `Target::armor_xyza_list()`）。
   2. 计算方位角：`azim = std::atan2(xyz.y(), xyz.x())`（世界坐标系 XY 平面内，从 $X_w$ 轴到目标向量的角度）。
-  3. 加上固定偏移：`yaw = azim + yaw_offset_`，`pitch = -bullet_traj.pitch - pitch_offset_`（弹道补偿后的俯仰角）。
+  3. 加上固定偏移：`yaw = azim + yaw_offset_`，`pitch = bullet_traj.pitch + pitch_offset_`（弹道补偿后的俯仰角）。
   4. MPC 围绕该目标角度生成平滑轨迹，最终 `plan.yaw`、`plan.pitch` 即为世界坐标系下的目标角度。
 - **下位机职责**：下位机接收世界坐标系下的目标角度，结合当前云台四元数 $q$（表示 IMU 机体坐标系到世界坐标系的旋转）与云台编码器反馈 `gs.yaw`、`gs.pitch`（云台相对于底盘的角度），**内部计算所需的云台控制量**。视觉端无需关心云台当前姿态，实现了解耦。
 
@@ -148,10 +148,10 @@ R_gimbal2world_ = R_gimbal2imubody_.transpose() * R_imubody2world * R_gimbal2imu
 - **补偿计算**：在 `Planner::aim()` 中：
   ```cpp
   auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
-  return {tools::limit_rad(azim + yaw_offset_), -bullet_traj.pitch - pitch_offset_};
+  return {tools::limit_rad(azim + yaw_offset_), bullet_traj.pitch + pitch_offset_};
   ```
   - `yaw_offset_`、`pitch_offset_` 为机械零位校准偏移。
-  - **负号**：子弹下落需向上抬升，故俯仰角取负值。
+  - `tools::Trajectory::pitch` 本身已按“抬头为正”返回补偿角，因此这里直接加上机械零位偏移。
 
 **3. 坐标系整合**
 1. 相机观测装甲板角点（像素坐标）→ 通过 PnP 得到相机坐标系下的位置 $P_c$。
@@ -509,6 +509,7 @@ tx_data.pitch = pitch; tx_data.pitch_vel = pitch_vel; tx_data.pitch_acc = pitch_
 * **数据记录**:
   - **标准模式**: 使用 `tools::Recorder` 记录图像、云台四元数与时间戳，供离线回放测试。
   - **调试模式**: 使用 `tools::Plotter` 将以下数据实时输出为 JSON 格式：
+    * pitch 原始值保留在 `*_pitch_raw` / `*_pitch_vel_raw` / `*_pitch_acc_raw`；为便于和下位机反馈同图对齐，`target_pitch`、`plan_pitch`、`plan_pitch_vel`、`plan_pitch_acc` 会经过调试层符号镜像后再送图。
     * 云台状态：`gimbal_yaw`、`gimbal_yaw_vel`、`gimbal_pitch`、`gimbal_pitch_vel`。
     * 目标状态：`target_z`、`target_vz`、`w`（角速度）。
     * 规划输出：`plan_yaw`、`plan_yaw_vel`、`plan_yaw_acc`、`plan_pitch`、`plan_pitch_vel`、`plan_pitch_acc`。

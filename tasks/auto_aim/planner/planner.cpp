@@ -262,7 +262,7 @@ Eigen::Matrix<double, 2, 1> Planner::aim(
     pitch_offset = pitch_offset_;
   }
 
-  return {tools::limit_rad(azim + yaw_offset), -bullet_traj.pitch - pitch_offset};
+  return {tools::limit_rad(azim + yaw_offset), bullet_traj.pitch + pitch_offset};
 }
 
 Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_speed)
@@ -273,10 +273,12 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
   auto yaw_pitch_last = aim(target, bullet_speed);
 
   target.predict(DT);  // [0] = -HALF_HORIZON * DT -> [HHALF_HORIZON] = 0
+  Eigen::Vector4d current_xyza = select_auto_aim_xyza(target);
   auto yaw_pitch = aim(target, bullet_speed);
 
   for (int i = 0; i < HORIZON; i++) {
     target.predict(DT);
+    Eigen::Vector4d next_xyza = select_auto_aim_xyza(target);
     auto yaw_pitch_next = aim(target, bullet_speed);
 
     auto yaw_vel = tools::limit_rad(yaw_pitch_next(0) - yaw_pitch_last(0)) / (2 * DT);
@@ -284,8 +286,13 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
 
     traj.col(i) << tools::limit_rad(yaw_pitch(0) - yaw0), yaw_vel, yaw_pitch(1), pitch_vel;
 
+    if (i == HALF_HORIZON) {
+      debug_xyza = current_xyza;
+    }
+
     yaw_pitch_last = yaw_pitch;
     yaw_pitch = yaw_pitch_next;
+    current_xyza = next_xyza;
   }
 
   return traj;

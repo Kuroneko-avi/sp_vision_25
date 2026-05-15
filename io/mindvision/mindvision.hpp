@@ -31,7 +31,7 @@ private:
   bool quit_, ok_;
   std::thread capture_thread_;
   std::thread daemon_thread_;
-  tools::ThreadSafeQueue<CameraData> queue_;
+  tools::ThreadSafeQueue<CameraData, true> queue_;
   int vid_, pid_;
 
   void open();

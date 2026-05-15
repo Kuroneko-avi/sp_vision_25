@@ -93,7 +93,8 @@ private:
 
   GimbalMode mode_ = GimbalMode::IDLE;
   GimbalState state_;
-  tools::ThreadSafeQueue<std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point>>
+  tools::ThreadSafeQueue<
+    std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point>, true>
     queue_{1000};
 
   bool read(uint8_t * buffer, size_t size);

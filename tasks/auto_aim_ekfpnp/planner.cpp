@@ -91,7 +91,7 @@ Eigen::Matrix<double, 2, 1> Planner::aim(
     pitch_offset = pitch_offset_;
   }
 
-  return {tools::limit_rad(azim + yaw_offset), -bullet_traj.pitch - pitch_offset};
+  return {tools::limit_rad(azim + yaw_offset), bullet_traj.pitch + pitch_offset};
 }
 
 Trajectory Planner::get_trajectory(

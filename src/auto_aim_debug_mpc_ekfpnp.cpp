@@ -12,6 +12,7 @@
 #include "io/camera.hpp"
 #include "io/gimbal/gimbal.hpp"
 #include "src/auto_aim_debug_dashboard.hpp"
+#include "src/auto_aim_debug_utils.hpp"
 #include "tasks/auto_aim/planner/planner.hpp"
 #include "tasks/auto_aim/solver.hpp"
 #include "tasks/auto_aim/yolo.hpp"
@@ -95,18 +96,22 @@ int main(int argc, char * argv[])
       data["gimbal_pitch_vel"] = gs.pitch_vel;
 
       data["target_yaw"] = plan.target_yaw;
-      data["target_pitch"] = plan.target_pitch;
+      data["target_pitch_raw"] = plan.target_pitch;
+      data["target_pitch"] = auto_aim::debug::plot_pitch(plan.target_pitch);
 
       data["plan_yaw"] = plan.yaw;
       data["plan_yaw_vel"] = plan.yaw_vel;
       data["plan_yaw_acc"] = plan.yaw_acc;
 
-      data["plan_pitch"] = plan.pitch;
-      data["plan_pitch_vel"] = plan.pitch_vel;
-      data["plan_pitch_acc"] = plan.pitch_acc;
+      data["plan_pitch_raw"] = plan.pitch;
+      data["plan_pitch"] = auto_aim::debug::plot_pitch(plan.pitch);
+      data["plan_pitch_vel_raw"] = plan.pitch_vel;
+      data["plan_pitch_vel"] = auto_aim::debug::plot_pitch(plan.pitch_vel);
+      data["plan_pitch_acc_raw"] = plan.pitch_acc;
+      data["plan_pitch_acc"] = auto_aim::debug::plot_pitch(plan.pitch_acc);
 
       data["yaw_error"] = gs.yaw - plan.target_yaw;
-      data["pitch_error"] = gs.pitch - plan.target_pitch;
+      data["pitch_error"] = auto_aim::debug::plot_pitch_error(gs.pitch, plan.target_pitch);
 
       data["fire"] = plan.fire ? 1 : 0;
       data["fired"] = fired ? 1 : 0;

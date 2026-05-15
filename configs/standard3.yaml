@@ -39,7 +39,7 @@ outpost_bad_converge_threshold: 0.55
 
 #####-----aimer参数-----#####
 yaw_offset: 0.2 # degree -2.5
-pitch_offset: 11.5 # degree 2
+pitch_offset: 0.5 # degree 2
 comming_angle: 55 # degree
 leaving_angle: 15 # degree
 decision_speed: 7 # rad/s
