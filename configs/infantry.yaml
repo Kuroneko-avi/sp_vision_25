@@ -37,8 +37,8 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-yaw_offset: 0.2 # degree -2.5
-pitch_offset: 0.5 # degree 2
+yaw_offset: -2.0 # degree -2.5
+pitch_offset: 2.0 # degree 2   越大越高  近处-1.5  远处2.0
 comming_angle: 55 # degree
 leaving_angle: 15 # degree
 decision_speed: 7 # rad/s
@@ -69,7 +69,7 @@ distort_coeffs: [-0.14832745634699146, 0.24250440433561063, -0.00062117617323155
 # 标定板到世界坐标系原点的水平距离: 0.90 m
 # 标定板同竖直摆放时的偏角: yaw47.87 pitch0.83 roll-2.16 degree
 R_camera2gimbal: [0.029526424514503324, -0.022209986753895829, 0.99931722027781622, -0.99933058498407445, 0.020948454053741652, 0.029992402173638688, -0.021600281729096706, -0.99953383072367785, -0.021576586107945914]
-t_camera2gimbal: [0.031896413223523871, -0.0012259075707201866, 0.098078535217175258]
+t_camera2gimbal: [-0.065, -0.02, 0.10]   #z增大pitch抬高
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x100
