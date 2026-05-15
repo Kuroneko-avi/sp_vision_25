@@ -31,8 +31,8 @@ using Clock = std::chrono::steady_clock;
 const std::string keys =
   "{help h usage ? |                        | output command line help }"
   "{@config-path   | configs/infantry.yaml | yaml config path }"
-  "{freq-hz        | 0.6                    | yaw sine frequency in Hz }"
-  "{amp-deg        | 7.0                    | yaw sine amplitude in degrees }"
+  "{freq-hz        | 0.8                    | yaw sine frequency in Hz }"
+  "{amp-deg        | 9.0                    | yaw sine amplitude in degrees }"
   "{delay-min-ms   | 0.0                   | minimum IMU delay in milliseconds }"
   "{delay-max-ms   | 25.0                   | maximum IMU delay in milliseconds }"
   "{delay-step-ms  | 1.0                    | IMU delay step in milliseconds }"
