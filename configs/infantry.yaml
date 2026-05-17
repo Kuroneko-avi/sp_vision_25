@@ -1,5 +1,5 @@
-# enemy_color: "red"
-enemy_color: "blue"
+enemy_color: "red"
+# enemy_color: "blue"
 
 #####-----神经网络参数-----#####
 yolo_name: yolov5
@@ -8,7 +8,7 @@ yolo11_model_path: assets/yolo11.xml
 yolov8_model_path: assets/yolov8.xml
 yolov5_model_path: assets/yolov5.xml
 device: CPU
-min_confidence: 0.8
+min_confidence: 0.4
 use_traditional: false
 
 #####-----ROI-----#####
@@ -35,7 +35,7 @@ max_rectangular_error: 25 # degree
 min_detect_count: 5
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
-outpost_bad_converge_threshold: 0.60
+outpost_bad_converge_threshold: 0.65
 
 #####-----aimer参数-----#####
 yaw_offset: -1.5 # degree -2.5
@@ -43,6 +43,8 @@ pitch_offset: 2.0 # degree 2   越大越高  近处-1.5  远处2.0
 comming_angle: 55 # degree
 leaving_angle: 15 # degree
 decision_speed: 7 # rad/s
+outpost_comming_angle: 55 # degree
+outpost_leaving_angle: 15 # degree
 high_speed_delay_time: 0.045 # s
 low_speed_delay_time: 0.042 # s planner use this value
 

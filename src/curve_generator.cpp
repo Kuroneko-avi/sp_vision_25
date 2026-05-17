@@ -184,7 +184,7 @@ int main(int argc, char * argv[])
     auto elapsed_s = tools::delta_time(now, start_time);
     auto [yaw0, traj] = build_reference(
       elapsed_s, amplitude_rad, frequency_hz, pitch_frequency_hz, pitch_low_rad, pitch_high_rad);
-    auto plan = planner.plan_trajectory(traj, yaw0);
+    auto plan = planner.get_trajectory(traj, yaw0);
     auto gs = gimbal.state();
 
     gimbal.send(
