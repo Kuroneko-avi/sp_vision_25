@@ -28,7 +28,7 @@ using namespace std::chrono_literals;
 
 namespace
 {
-constexpr auto kDefaultImuDelay = std::chrono::milliseconds(6);
+constexpr auto kDefaultImuDelay = std::chrono::milliseconds(8);
 constexpr auto kStaleTargetTimeout = std::chrono::milliseconds(120);
 
 struct TimedTarget

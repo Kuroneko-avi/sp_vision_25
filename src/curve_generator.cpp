@@ -26,12 +26,12 @@ constexpr double REPORT_INTERVAL_S = 5.0;
 
 const std::string keys =
   "{help h usage ? |                        | output command line help }"
-  "{amplitude-deg  | -1                     | override target yaw amplitude in degree }"
-  "{frequency-hz   | -1                     | override target yaw frequency in Hz }"
+  "{amplitude-deg  | 10                     | override target yaw amplitude in degree }"
+  "{frequency-hz   | 3                     | override target yaw frequency in Hz }"
   "{pitch-frequency-hz | -1                 | override target pitch step frequency in Hz }"
-  "{pitch-low-deg  | 1000                   | override low target pitch in degree }"
-  "{pitch-high-deg | 1000                   | override high target pitch in degree }"
-  "{@config-path   | configs/standard3.yaml | yaml config path }";
+  "{pitch-low-deg  | 0                   | override low target pitch in degree }"
+  "{pitch-high-deg | 0                   | override high target pitch in degree }"
+  "{@config-path   | configs/standard3_trt.yaml | yaml config path }";
 
 double read_curve_param(const YAML::Node & curve_yaml, const std::string & key, double fallback)
 {
@@ -169,7 +169,7 @@ int main(int argc, char * argv[])
 
   while (!exiter.exit()) {
     const auto now = std::chrono::steady_clock::now();
-    const auto mode = gimbal.mode();
+    const auto mode = io::GimbalMode::AUTO_AIM;
     if (mode != last_mode) {
       tools::logger()->info("curve_generator switch to {}", gimbal.str(mode));
       last_mode = mode;
