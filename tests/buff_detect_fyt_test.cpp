@@ -1,5 +1,6 @@
 #include <fmt/core.h>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -52,6 +53,13 @@ void draw_rune_object(cv::Mat & img, const auto_buff_fyt::RuneObject & obj, bool
   cv::putText(
     img, rune_color + rune_type, cv::Point2i(pts[2]), cv::FONT_HERSHEY_SIMPLEX, 0.8, line_color,
     2);
+}
+
+cv::Point2f fanblade_center(const auto_buff_fyt::RuneObject & obj)
+{
+  return (
+           obj.pts.bottom_left + obj.pts.top_left + obj.pts.top_right + obj.pts.bottom_right) /
+         4.0f;
 }
 }  // namespace
 
@@ -118,16 +126,26 @@ int main(int argc, char * argv[])
 
     auto selected = detector.detect(img);
     const auto & filtered_objects = detector.last_filtered_objects();
+    const auto & candidates = detector.last_candidates();
+    const auto & locked_candidate = detector.locked_candidate();
     const auto & binary_roi = detector.last_binary_roi();
 
     if (!filtered_objects.empty()) ++model_detected_frames;
     if (selected.has_value()) ++selected_target_frames;
 
     for (const auto & obj : filtered_objects) {
-      const bool is_selected_candidate =
-        selected.has_value() && obj.type == auto_buff_fyt::RuneType::INACTIVATED &&
-        cv::norm(obj.pts.bottom_left - selected->target().points[0]) < 1.0;
+      const bool is_selected_candidate = std::any_of(
+        candidates.begin(), candidates.end(), [&obj](const auto_buff_fyt::RuneObject & candidate) {
+          return cv::norm(fanblade_center(obj) - fanblade_center(candidate)) < 1.0f;
+        });
       draw_rune_object(img, obj, is_selected_candidate);
+    }
+
+    if (locked_candidate.has_value()) {
+      cv::circle(img, fanblade_center(locked_candidate.value()), 10, cv::Scalar(0, 255, 255), 2);
+      cv::putText(
+        img, "LOCK", cv::Point2i(fanblade_center(locked_candidate.value())),
+        cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 255), 2);
     }
 
     if (selected.has_value()) {
@@ -178,6 +196,9 @@ int main(int argc, char * argv[])
         "frame:{} model:{}/{} target:{} solved:{}", frame_count, model_detected_frames,
         total_frames, selected_target_frames, solved_frames),
       {20, 40}, cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+    cv::putText(
+      img, fmt::format("candidates:{}", candidates.size()), {20, 70}, cv::FONT_HERSHEY_SIMPLEX,
+      0.7, cv::Scalar(0, 255, 255), 2);
 
     if (display) {
       cv::imshow("buff_detect_fyt_test", img);
