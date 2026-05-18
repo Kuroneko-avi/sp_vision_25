@@ -122,6 +122,7 @@ add_executable(handeye_test tests/handeye_test.cpp)
 add_executable(dm_test tests/dm_test.cpp)
 add_executable(minimum_vision_system tests/minimum_vision_system.cpp)
 add_executable(dashboard_params_test tests/dashboard_params_test.cpp)
+add_executable(curve_generator_test tests/curve_generator_test.cpp)
 if(TARGET mqtt_bridge)
     add_executable(mqtt_bridge_smoke tests/mqtt_bridge_smoke.cpp)
 endif()
@@ -145,6 +146,7 @@ target_link_libraries(handeye_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io aut
 target_link_libraries(dm_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io)
 target_link_libraries(minimum_vision_system ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 target_link_libraries(dashboard_params_test dashboard_params fmt::fmt)
+target_link_libraries(curve_generator_test ${OpenCV_LIBS} fmt::fmt auto_aim tools)
 if(TARGET mqtt_bridge)
     target_link_libraries(mqtt_bridge_smoke
         mqtt_bridge
