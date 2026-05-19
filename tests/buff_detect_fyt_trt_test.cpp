@@ -8,7 +8,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "tasks/auto_buff_fyt/buff_aimer.hpp"
-#include "tasks/auto_buff_fyt/buff_detector.hpp"
+#include "tasks/auto_buff_fyt/buff_detector_trt.hpp"
 #include "tasks/auto_buff_fyt/buff_solver.hpp"
 #include "tasks/auto_buff_fyt/buff_target.hpp"
 #include "tools/exiter.hpp"
@@ -18,12 +18,12 @@
 namespace
 {
 const std::string keys =
-  "{help h usage ? |                         | show help message}"
+  "{help h usage ? |                             | show help message}"
   "{config-path c  | configs/standard3_trt.yaml  | path to yaml config}"
-  "{display d      | true                    | display debug window}"
-  "{start-index s  | 0                       | first frame index}"
-  "{end-index e    | 0                       | last frame index, 0 means run to end}"
-  "{@video-path    | assets/big.avi          | input video path}";
+  "{display d      | true                        | display debug window}"
+  "{start-index s  | 0                           | first frame index}"
+  "{end-index e    | 0                           | last frame index, 0 means run to end}"
+  "{@video-path    | assets/big.avi              | input video path}";
 
 void draw_rune_object(cv::Mat & img, const auto_buff_fyt::RuneObject & obj, bool selected_candidate)
 {
@@ -78,14 +78,14 @@ int main(int argc, char * argv[])
   const auto end_index = cli.get<int>("end-index");
 
   tools::Exiter exiter;
-  auto_buff_fyt::Buff_Detector detector(config_path);
+  auto_buff_fyt::Buff_DetectorTRT detector(config_path);
   auto_buff_fyt::Solver solver(config_path);
   auto_buff_fyt::BigTarget target;
   auto_buff_fyt::Aimer aimer(config_path);
 
   cv::VideoCapture video(video_path);
   if (!video.isOpened()) {
-    tools::logger()->error("[buff_detect_fyt_test] failed to open video: {}", video_path);
+    tools::logger()->error("[buff_detect_fyt_trt_test] failed to open video: {}", video_path);
     return 1;
   }
 
@@ -201,7 +201,7 @@ int main(int argc, char * argv[])
       0.7, cv::Scalar(0, 255, 255), 2);
 
     if (display) {
-      cv::imshow("buff_detect_fyt_test", img);
+      cv::imshow("buff_detect_fyt_trt_test", img);
       const int key = cv::waitKey(30);
       if (key == 'q') break;
     }
@@ -210,12 +210,12 @@ int main(int argc, char * argv[])
   if (display) cv::destroyAllWindows();
 
   tools::logger()->info(
-    "[buff_detect_fyt_test] model detected {}/{} frames, selected {}/{} frames, solved {}/{} frames",
+    "[buff_detect_fyt_trt_test] model detected {}/{} frames, selected {}/{} frames, solved {}/{} frames",
     model_detected_frames, total_frames, selected_target_frames, total_frames, solved_frames,
     total_frames);
 
   if (total_frames == 0) {
-    tools::logger()->error("[buff_detect_fyt_test] no frames were read from {}", video_path);
+    tools::logger()->error("[buff_detect_fyt_trt_test] no frames were read from {}", video_path);
     return 1;
   }
 
