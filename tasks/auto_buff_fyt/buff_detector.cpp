@@ -9,9 +9,9 @@ namespace auto_buff_fyt
 {
 namespace
 {
-EnemyColor parse_enemy_color(const std::string & color)
+EnemyColor parse_buff_detect_color(const std::string & enemy_color)
 {
-  return color == "blue" ? EnemyColor::BLUE : EnemyColor::RED;
+  return enemy_color == "blue" ? EnemyColor::RED : EnemyColor::BLUE;
 }
 
 float normalize_angle(float angle)
@@ -33,7 +33,7 @@ Buff_Detector::Buff_Detector(const std::string & config_path) : detector_(config
 {
   auto yaml = YAML::LoadFile(config_path);
   auto node = yaml["buff_fyt_detector"];
-  detect_color_ = parse_enemy_color(yaml["enemy_color"].as<std::string>());
+  detect_color_ = parse_buff_detect_color(yaml["enemy_color"].as<std::string>());
   max_candidates_ = node && node["max_candidates"] ? node["max_candidates"].as<int>() : 2;
   min_radius_ratio_ =
     node && node["min_radius_ratio"] ? node["min_radius_ratio"].as<float>() : 0.8f;
