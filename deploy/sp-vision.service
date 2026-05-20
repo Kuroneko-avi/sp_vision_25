@@ -1,0 +1,19 @@
+[Unit]
+Description=SP Vision 25 standard_mpc_fyt
+Wants=network.target systemd-udev-settle.service
+After=network.target systemd-udev-settle.service
+
+[Service]
+Type=simple
+User=jwj-rune
+SupplementaryGroups=dialout
+WorkingDirectory=/home/jwj-rune/Downloads/sp_vision_25
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 20); do lsusb -d 2bdf:0001 >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1'
+ExecStartPre=/usr/bin/sleep 5
+ExecStartPre=/usr/bin/test -e /dev/gimbal
+ExecStart=/home/jwj-rune/Downloads/sp_vision_25/build/standard_mpc_fyt configs/infantry.yaml
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -18,13 +18,18 @@
 #include "tools/trajectory.hpp"
 
 const std::string keys =
-  "{help h usage ? | | 输出命令行参数说明}"
-  "{@config-path   | | yaml配置文件路径 }";
+  
+  "{help h usage ? |                        | output command line help }"
+  "{imu-delay-ms   | 1.0                    | IMU delay in milliseconds }"
+
+  "{@config-path   | configs/infantry.yaml | yaml config path }";
+
 
 int main(int argc, char * argv[])
 {
   cv::CommandLineParser cli(argc, argv, keys);
   auto config_path = cli.get<std::string>(0);
+  auto imu_delay_ms = cli.get<double>("imu-delay-ms");
   if (cli.has("help") || config_path.empty()) {
     cli.printMessage();
     return 0;
@@ -39,8 +44,8 @@ int main(int argc, char * argv[])
 
   auto_buff_fyt::Buff_Detector detector(config_path);
   auto_buff_fyt::Solver solver(config_path);
-  auto_buff_fyt::SmallTarget target;
-  // auto_buff_fyt::BigTarget target;
+  // auto_buff_fyt::SmallTarget target;
+  auto_buff_fyt::BigTarget target;
   auto_buff_fyt::Aimer aimer(config_path);
 
   cv::Mat img;
@@ -137,6 +142,11 @@ int main(int argc, char * argv[])
       data["plan_pitch_acc"] = plan.pitch_acc * 57.3;
       data["shoot"] = plan.fire ? 1 : 0;
     }
+
+    std::chrono::steady_clock::time_point t;
+    auto imu_delay = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+      std::chrono::duration<double, std::milli>(imu_delay_ms));
+
 
     plotter.plot(data);
 

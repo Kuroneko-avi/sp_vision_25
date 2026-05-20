@@ -23,7 +23,7 @@ const std::string keys =
   "{display d      | true                    | display debug window}"
   "{start-index s  | 0                       | first frame index}"
   "{end-index e    | 0                       | last frame index, 0 means run to end}"
-  "{@video-path    | assets/big.avi          | input video path}";
+  "{@video-path    | assets/buff/buff.avi          | input video path}";
 
 void draw_rune_object(cv::Mat & img, const auto_buff_fyt::RuneObject & obj, bool selected_candidate)
 {
