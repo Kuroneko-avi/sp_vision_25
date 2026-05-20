@@ -25,8 +25,8 @@ constexpr double REPORT_INTERVAL_S = 5.0;
 
 const std::string keys =
   "{help h usage ? |                        | output command line help }"
-  "{amplitude-deg  | 13                     | override target yaw amplitude in degree }"
-  "{frequency-hz   | 5                     | override target yaw frequency in Hz }"
+  "{amplitude-deg  | 8                     | override target yaw amplitude in degree }"
+  "{frequency-hz   | 3                     | override target yaw frequency in Hz }"
   "{pitch-frequency-hz | -1                 | override target pitch step frequency in Hz }"
   "{pitch-low-deg  | 0                   | override low target pitch in degree }"
   "{pitch-high-deg | 0                   | override high target pitch in degree }"

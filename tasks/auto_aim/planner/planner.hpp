@@ -70,7 +70,7 @@ private:
   void setup_pitch_solver(const std::string & config_path);
 
   Eigen::Matrix<double, 2, 1> aim(
-    const Target & target, double bullet_speed, bool update_debug_xyza = false);
+    const Target & target, double bullet_speed, bool update_debug_xyza = true);
   Eigen::Matrix<double, 2, 1> aim(const auto_aim_ekfpnp::Target & target, double bullet_speed);
   Trajectory get_trajectory(Target & target, double yaw0, double bullet_speed);
   Trajectory get_trajectory(auto_aim_ekfpnp::Target & target, double yaw0, double bullet_speed);
